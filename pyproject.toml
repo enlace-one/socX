@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=42"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "socx"
+version = "0.0.7"
+authors = [
+  { name="Enlace", email="enlace.aman@gmail.com" },
+]
+description = "A set of useful tools for a security operations center"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+[project.scripts]
+socx = "socx:main"

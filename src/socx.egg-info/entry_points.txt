@@ -1,0 +1,2 @@
+[console_scripts]
+socx = socx:main

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
+
 try:
     import argparse
     import os
+    import time
     import re
     import socket
     import hashlib
     import requests
     import sqlite3 as sql
     import pandas as pd
+    import keyring
     import xml.etree.ElementTree as ET
 
     try:
@@ -27,6 +30,12 @@ or
 program_name = "socx"
 VERSION = 1.0
 about = f"""
+   _____ ____  _______  __
+  / ___// __ \/ ____/ |/ /
+  \__ \/ / / / /    |   / 
+ ___/ / /_/ / /___ /   |  
+/____/\____/\____//_/|_|  
+
 Version: {VERSION}
 A tool to assist with day to day activites in a security operations center (pronounced "socks")
 """
@@ -34,8 +43,10 @@ A tool to assist with day to day activites in a security operations center (pron
 usage = f"""Usage:
     {program_name} [universal options] [function] [options]
     python {program_name}.py [universal options] [function] [options]
-    
+        
 Examples:
+    {program_name} --help
+    {program_name} info -h
     {program_name} info -ip 1.2.3.4
     {program_name} -v 3 info -d google.com
     {program_name} search -f filename.txt -i
@@ -66,11 +77,10 @@ def main():
         default=1,
         help="The verbosity, 0 for quiet, 5 for very verbose",
     )
-    parser.add_argument(
-        "-c",
-        "--config",
-        action="store_true",
-        help="Edit the settings, keys, and variables",
+
+    # Config - Edit stored settings
+    config = subparsers.add_parser(
+        "config", help="Edit the settings, keys, and variables"
     )
 
     # Information - Online
@@ -79,6 +89,7 @@ def main():
     )
     info.add_argument("-ip", "--ip", type=str, help="An IP address")
     info.add_argument("-d", "--domain", type=str, help="A domain (google.com)")
+    info.add_argument("-url", "--url", type=str, help="A url")
     # add URL, Hash?
 
     # Search - Local
@@ -130,6 +141,12 @@ def main():
         default="~",
         help="The user's name to use. Default is current user.",
     )
+    tools.add_argument(
+        "-r",
+        "--regex",
+        action="store_true",
+        help="Launch a regex testing environment.",
+    )
 
     args = parser.parse_args()
 
@@ -145,15 +162,19 @@ def main():
     ## Config ##
     ############
 
-    environmental_variables = {"InsightVMAPI_BASE_URL": "", "InsightVMAPI_KEY": ""}
+    environmental_variables = {
+        "InsightVMAPI_BASE_URL": "",
+        "InsightVMAPI_KEY": "",
+        "VirusTotalAPI_KEY": "",
+    }
 
     def get_enironmental_variable(name):
-        value = os.environ.get("_socX__" + name)
+        value = keyring.get_password("system", "_socX__" + name)
         if value is None:
             value = environmental_variables[name]
         return value
 
-    if args.config:
+    if args.function == "config":
         while True:
             p("Settings, keys, variables", v=1)
             for index, var in enumerate(environmental_variables.keys()):
@@ -173,8 +194,11 @@ def main():
             new_value = input("New value (Nothing to cancel): ")
             if new_value == "":
                 continue
-            os.environ["_socX__" + list(environmental_variables.keys())[index]] = (
-                new_value
+            print("_socX__" + list(environmental_variables.keys())[index])
+            keyring.set_password(
+                "system",
+                "_socX__" + list(environmental_variables.keys())[index],
+                new_value,
             )
             p("Value updated\n", v=1)
 
@@ -259,6 +283,40 @@ def main():
 
             print_ip_info(ip)
             print(f"Whois record: https://www.whois.com/whois/{args.domain}")
+
+        elif args.url:
+            url = unwrap_url(args.url)
+
+            # Virus total post url
+            vt_api_key = get_enironmental_variable("VirusTotalAPI_KEY")
+            vt_report_url = ""
+            if vt_api_key != "":
+                response = requests.request(
+                    "POST",
+                    url="https://www.virustotal.com/api/v3/urls",
+                    headers={"x-apikey": vt_api_key},
+                    data={"url": url},
+                )
+                vt_report_url = response.json()["data"]["links"]["self"]
+
+            p(f"Getting information on {url} (unwrapped)", v=1)
+
+            # Virus total get url
+            if vt_api_key != "":
+                p("Waiting for Virustotal to process..", v=3)
+                for seconds in [5, 7, 10, 15]:
+                    time.sleep(seconds)
+                    report_response = requests.request(
+                        "GET", url=vt_report_url, headers={"x-apikey": vt_api_key}
+                    ).json()
+                    if report_response["data"]["attributes"]["status"] != "queued":
+                        print("Virustotal:", report_response["data"]["links"]["item"])
+                        print(
+                            "Virustotal:",
+                            report_response["data"]["attributes"]["stats"],
+                        )
+                        p("P.S. Run again if stats are incomplete now.", v=3)
+                        break
 
     ############
     ## Search ##
@@ -468,6 +526,50 @@ def main():
                     for line in file:
                         output_file.write(line)
             p("Command history gathered", v=3)
+
+        elif args.regex:
+            to_match_list = []
+
+            def append_matches():
+                while True:
+                    to_match = input("Enter text to match (nothing to stop):")
+                    if to_match == "":
+                        break
+                    to_match_list.append(to_match)
+
+            to_fail_list = []
+
+            def append_failures():
+                while True:
+                    to_fail = input("Enter text to fail (nothing to stop):")
+                    if to_fail == "":
+                        break
+                    to_fail_list.append(to_fail)
+
+            def run_tests():
+                while True:
+                    success = True
+                    regex = input("Enter regex to test (nothing to stop):")
+                    if regex == "":
+                        break
+                    for to_match in to_match_list:
+                        if not re.search(regex, to_match):
+                            p(f"Failed to match: {to_match}")
+                            success = False
+                    for to_fail in to_fail_list:
+                        if re.search(regex, to_fail):
+                            p(f"Failed by matching: {to_fail}")
+                            success = False
+                    if success:
+                        p("SUCCESS")
+
+            append_matches()
+            append_failures()
+            run_tests()
+
+    if not args.function:
+        print(f"You must provide a function.")
+        print(usage)
 
 
 if __name__ == "__main__":

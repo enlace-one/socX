@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "socx"
-version = "0.0.7"
+version = "0.0.9"
 authors = [
   { name="Enlace", email="enlace.aman@gmail.com" },
 ]

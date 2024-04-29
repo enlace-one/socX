@@ -20,4 +20,5 @@ python -m pip install -i https://test.pypi.org/simple/ socx==0.0.3
 
 ### Uploading Python Package
 python -m build
+python -m twine upload dist/*
 python -m twine upload --repository testpypi dist/*

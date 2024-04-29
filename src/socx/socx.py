@@ -12,6 +12,7 @@ try:
     import pandas as pd
     import keyring
     import xml.etree.ElementTree as ET
+    from pathlib import Path
 
     try:
         from . import util
@@ -27,8 +28,9 @@ or
     )
     exit(1)
 
+
 program_name = "socx"
-VERSION = 1.0
+VERSION = 1.1
 about = f"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -146,6 +148,13 @@ def main():
         "--regex",
         action="store_true",
         help="Launch a regex testing environment.",
+    )
+    tools.add_argument(
+        "-c",
+        "--csvs",
+        type=int,
+        default=0,
+        help="Combine the last X modified csvs in the current directory. Enter 1 for walkthrough",
     )
 
     args = parser.parse_args()
@@ -512,6 +521,40 @@ def main():
                                 con.close()
                             except Exception as e:
                                 p(f"Error with {name} - {e}", v=3)
+
+        elif args.csvs:
+            p("Starting combine CSVs", v=5)
+
+            paths = sorted(Path().iterdir(), key=os.path.getmtime)
+            paths.reverse()
+
+            if args.csvs < 2:
+                accum = 1
+                p("File Paths", v=3)
+                for path in paths:
+                    if str(path).endswith(".csv"):
+                        p(f"{accum} - {path}")
+                        accum += 1
+                csvs = int(input("Enter the index of the last CSV to include:"))
+            else:
+                csvs = args.csvs
+
+            # Get File Paths
+            file_paths = []
+            for path in paths:
+                if str(path).endswith(".csv"):
+                    file_paths.append(str(path))
+                    p(f"Added {path}", v=4)
+                    csvs -= 1
+                    if csvs == 0:
+                        break
+            dfs = []
+            for path in file_paths:
+                df = pd.read_csv(path)
+                dfs.append(df)
+            df = pd.concat(dfs)
+            df.to_csv("COMBINED_FILE.csv", index=False)
+            p("Outputed to COMBINED_FILE.csv", v=3)
 
         elif args.cmdhistory:
             p("Gathering command history. Will output to cwd.", v=3)

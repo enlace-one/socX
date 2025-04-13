@@ -68,10 +68,6 @@ Examples:
 #############
 
 verbosity = 1
-case_insensitive = True
-is_regex = False
-find_all = False
-user = ""
 
 environmental_variables = {
     "InsightVMAPI_BASE_URL": "",
@@ -98,7 +94,7 @@ def unwrap_url(url):
     return url
 
 
-def search(pattern, string):
+def search(pattern, string, case_insensitive):
     if case_insensitive:
         return re.search(pattern, string, re.IGNORECASE)
     else:
@@ -400,10 +396,12 @@ def do_browser_history():
                         p(f"Error with {name} - {e}", v=3)
 
 
-def do_combine_csvs(csvs=0):
+def do_combine_csvs(count=0):
     p("Starting combine CSVs", v=5)
+    p("The current directory will be used to find the CSVs.", v=1)
     paths = sorted(Path().iterdir(), key=os.path.getmtime)
     paths.reverse()
+    csvs = count
 
     if csvs < 2:
         accum = 1
@@ -447,88 +445,333 @@ def do_command_history():
     p("Command history gathered", v=3)
 
 
+##############################
+# Function and Argument List #
+##############################
+
+# Centralized function definitions
+FUNCTIONS = [
+    {
+        "name": "Edit SOCX Config",
+        "command": "config",
+        "function": lambda: do_config(),  # Wrap in lambda to handle no args
+        "arguments": [],
+        "category": "config",
+    },
+    {
+        "name": "Combine CSVs",
+        "command": "combine_csvs",
+        "function": do_combine_csvs,
+        "arguments": [
+            {
+                "name": "count",
+                "flag": "--csvs",
+                "prompt": "Enter number of CSVs to combine (1 for walkthrough): ",
+                "type": int,
+                "default": 0,
+                "required": False,
+                "help": "Combine the last X modified CSVs in the current directory. Enter 1 for walkthrough",
+            }
+        ],
+        "category": "tools",
+    },
+    {
+        "name": "Unwrap a URLDefense URL",
+        "command": "url_unwrap",
+        "function": do_url_unwrap,
+        "arguments": [
+            {
+                "name": "url",
+                "flag": "--url",
+                "prompt": "Enter the URL: ",
+                "type": str,
+                "required": True,
+                "help": "A URL to unwrap (remove safelinks and protectlinks)",
+            }
+        ],
+        "category": "tools",
+    },
+    {
+        "name": "Get info on a URL",
+        "command": "url_info",
+        "function": do_url_info,
+        "arguments": [
+            {
+                "name": "url",
+                "flag": "--url",
+                "prompt": "Enter the URL: ",
+                "type": str,
+                "required": True,
+                "help": "A URL to get info on",
+            }
+        ],
+        "category": "info",
+    },
+    {
+        "name": "Get info on a domain",
+        "command": "domain_info",
+        "function": do_domain_info,
+        "arguments": [
+            {
+                "name": "domain",
+                "flag": "--domain",
+                "prompt": "Enter the domain: ",
+                "type": str,
+                "required": True,
+                "help": "A domain (e.g., google.com)",
+            }
+        ],
+        "category": "info",
+    },
+    {
+        "name": "Get info on an IP",
+        "command": "ip_info",
+        "function": do_ip_info,
+        "arguments": [
+            {
+                "name": "ip",
+                "flag": "--ip",
+                "prompt": "Enter the IP: ",
+                "type": str,
+                "required": True,
+                "help": "An IP address",
+            }
+        ],
+        "category": "info",
+    },
+    {
+        "name": "Find a file",
+        "command": "filename_search",
+        "function": do_filename_search,
+        "arguments": [
+            {
+                "name": "filename",
+                "flag": "--filename",
+                "prompt": "Enter the file's name: ",
+                "type": str,
+                "required": True,
+                "help": "A file or folder name",
+            },
+            {
+                "name": "is_regex",
+                "flag": "--regex",
+                "prompt": "Use regex pattern? (y/n): ",
+                "type": bool,
+                "action": "store_true",
+                "default": False,
+                "required": False,
+                "help": "The query is a regex pattern",
+            },
+            {
+                "name": "find_all",
+                "flag": "--find_all",
+                "prompt": "Find all occurrences? (y/n): ",
+                "type": bool,
+                "action": "store_true",
+                "default": False,
+                "required": False,
+                "help": "Find all occurrences (default is find first)",
+            },
+            {
+                "name": "case_insensitive",
+                "flag": "--insensitive",
+                "prompt": "Case insensitive search? (y/n): ",
+                "type": bool,
+                "action": "store_true",
+                "default": False,
+                "required": False,
+                "help": "Search case insensitive (default is case sensitive)",
+            },
+        ],
+        "category": "search",
+    },
+    {
+        "name": "Gather browser history",
+        "command": "browser_history",
+        "function": do_browser_history,
+        "arguments": [
+            {
+                "name": "user",
+                "flag": "--user",
+                "prompt": "Enter the user's name (~ for current): ",
+                "type": str,
+                "default": "~",
+                "required": False,
+                "help": "The user's name to use. Default is current user.",
+            }
+        ],
+        "category": "tools",
+    },
+    {
+        "name": "Gather command history",
+        "command": "cmd_history",
+        "function": do_command_history,
+        "arguments": [
+            {
+                "name": "user",
+                "flag": "--user",
+                "prompt": "Enter the user's name (~ for current): ",
+                "type": str,
+                "default": "~",
+                "required": False,
+                "help": "The user's name to use. Default is current user.",
+            }
+        ],
+        "category": "tools",
+    },
+]
+
 ####################
 # Interactive Mode #
 ####################
 
 
 def interactive_mode():
-    functions = [
-        {"name": "Edit SOCX Config", "function": do_config, "arguments": []},
-        {
-            "name": "Combine CSVs",
-            "function": do_combine_csvs,
-            "arguments": [],  # Will prompt if blank
-        },
-        {
-            "name": "Unwrap a URLDefense URL",
-            "function": do_url_unwrap,
-            "arguments": [{"name": "url", "prompt": "Enter the URL: ", "type": str}],
-        },
-        {
-            "name": "Get info on a URL",
-            "function": do_url_info,
-            "arguments": [{"name": "url", "prompt": "Enter the URL: ", "type": str}],
-        },
-        {
-            "name": "Get info on a domain",
-            "function": do_domain_info,
-            "arguments": [
-                {"name": "domain", "prompt": "Enter the domain: ", "type": str}
-            ],
-        },
-        {
-            "name": "Get info on an ip",
-            "function": do_ip_info,
-            "arguments": [{"name": "ip", "prompt": "Enter the ip: ", "type": str}],
-        },
-        {
-            "name": "Find a file",
-            "function": do_filename_search,
-            "required_variables": ["is_regex", "find_all"],
-            "arguments": [
-                {"name": "filename", "prompt": "Enter the file's name: ", "type": str}
-            ],
-        },
-        {
-            "name": "Gather browser history",
-            "function": do_browser_history,
-            "arguments": [],
-        },
-        {
-            "name": "Gather command history",
-            "function": do_command_history,
-            "arguments": [],
-        },
-    ]
-
-    # Display the menu
-    for index, func in enumerate(functions):
+    # Display menu
+    for index, func in enumerate(FUNCTIONS):
         print(f"{index}: {func['name']}")
 
     # Get user's choice
-    index = int(input("Enter the number of the function you'd like to perform: "))
-    selected = functions[index]
+    try:
+        index = int(input("Enter the number of the function to perform: "))
+        selected = FUNCTIONS[index]
+    except (ValueError, IndexError):
+        print("Invalid choice.")
+        return
 
-    for rv in selected.get("required_variables", []):
-        current_val = globals().get(rv)
-        if isinstance(current_val, bool):
-            response = input(f"Enter the value for {rv} (y/n): ").strip().lower()
-            globals()[rv] = "y" in response
-
-    # Prompt for arguments
+    # Initialize kwargs
     kwargs = {}
-    for argument in selected["arguments"]:
-        raw = input(argument["prompt"])
-        if argument["type"] == int:
-            kwargs[argument["name"]] = int(raw)
-        else:
-            kwargs[argument["name"]] = raw.strip()
 
-        # Any non-bool required variables?
+    # Prompt for required arguments
+    required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
+    for arg in required_args:
+        while True:
+            value = input(arg["prompt"]).strip()
+            if not value:
+                print("This argument is required. Please provide a value.")
+                continue
+            try:
+                kwargs[arg["name"]] = arg["type"](value)
+                break
+            except (ValueError, TypeError):
+                print(f"Invalid value for {arg['name']}. Please try again.")
+
+    # Display optional arguments
+    optional_args = [
+        arg for arg in selected["arguments"] if not arg.get("required", False)
+    ]
+    if optional_args:
+        print(f"Optional arguments for {selected['name']}:")
+        for arg in optional_args:
+            if arg.get("action") == "store_true":
+                print(f"'{arg['flag']}' : {arg['help']}")
+            else:
+                print(f"'{arg['flag']} value' : {arg['help']}")
+
+        # Get optional arguments as a single input string
+        arguments = input(
+            "Enter optional arguments (e.g., --flag --flag2 value): "
+        ).strip()
+
+        # Parse the input string
+        if arguments:
+            tokens = arguments.split()
+            i = 0
+            while i < len(tokens):
+                flag = tokens[i]
+                arg_def = next(
+                    (arg for arg in optional_args if arg["flag"] == flag), None
+                )
+                if not arg_def:
+                    print(f"Warning: Unknown flag '{flag}' ignored.")
+                    i += 1
+                    continue
+
+                if arg_def.get("action") == "store_true":
+                    kwargs[arg_def["name"]] = True
+                    i += 1
+                else:
+                    if i + 1 >= len(tokens):
+                        print(
+                            f"Warning: No value provided for '{flag}'. Using default if available."
+                        )
+                        kwargs[arg_def["name"]] = arg_def.get("default")
+                        i += 1
+                        continue
+                    value = tokens[i + 1]
+                    try:
+                        kwargs[arg_def["name"]] = arg_def["type"](value)
+                        i += 2
+                    except (ValueError, TypeError):
+                        print(
+                            f"Warning: Invalid value '{value}' for '{flag}'. Using default if available."
+                        )
+                        kwargs[arg_def["name"]] = arg_def.get("default")
+                        i += 2
+
+    # Set defaults for any optional arguments not provided
+    for arg in optional_args:
+        if arg["name"] not in kwargs:
+            if arg.get("action") == "store_true":
+                kwargs[arg["name"]] = False
+            else:
+                kwargs[arg["name"]] = arg.get("default")
 
     # Call the function
-    selected["function"](**kwargs)
+    try:
+        selected["function"](**kwargs)
+    except TypeError as e:
+        print(f"Error calling function: {e}")
+
+
+####################
+# Argument Parsing #
+####################
+def build_parser():
+    parser = argparse.ArgumentParser(prog=PROGRAM_NAME, description=ABOUT, usage=USAGE)
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        type=int,
+        default=1,
+        help="Verbosity level, 0 for quiet, 5 for very verbose",
+    )
+    subparsers = parser.add_subparsers(dest="function", help="Function to perform")
+
+    # Group functions by category
+    categories = {
+        "config": subparsers.add_parser("config", help="Configuration functions"),
+        "info": subparsers.add_parser("info", help="Gather information"),
+        "search": subparsers.add_parser("search", help="Search this machine"),
+        "tools": subparsers.add_parser("tools", help="Utility tools"),
+    }
+
+    # Collect unique arguments per category
+    for category in categories:
+        category_parser = categories[category]
+        # Get all functions in this category
+        category_functions = [f for f in FUNCTIONS if f["category"] == category]
+        # Collect unique arguments
+        arg_set = {}
+        for func in category_functions:
+            for arg in func.get("arguments", []):
+                flag = arg["flag"]
+                if flag not in arg_set:
+                    arg_set[flag] = arg
+
+        # Add unique arguments to the subparser
+        for flag, arg in arg_set.items():
+            kwargs = {
+                "help": arg.get("help", ""),
+            }
+            if arg.get("action"):
+                kwargs["action"] = arg["action"]
+            else:
+                kwargs["type"] = arg.get("type", str)
+                kwargs["default"] = arg.get("default")
+            category_parser.add_argument(flag, **kwargs)
+
+    return parser
 
 
 ########
@@ -548,95 +791,7 @@ def main():
     # Parse Arguments #
     ###################
 
-    parser = argparse.ArgumentParser(prog=PROGRAM_NAME, description=ABOUT, usage=USAGE)
-    subparsers = parser.add_subparsers(dest="function", help="Function to perform")
-
-    # Universal Arguments
-    parser.add_argument(
-        "-v",
-        "--verbosity",
-        type=int,
-        default=1,
-        help="The verbosity, 0 for quiet, 5 for very verbose",
-    )
-
-    # Config - Edit stored settings
-    config = subparsers.add_parser(
-        "config", help="Edit the settings, keys, and variables"
-    )
-
-    # Information - Online
-    info = subparsers.add_parser(
-        "info", help="Gather information on the specified topic"
-    )
-    info.add_argument("-ip", "--ip", type=str, help="An IP address")
-    info.add_argument("-d", "--domain", type=str, help="A domain (google.com)")
-    info.add_argument("-url", "--url", type=str, help="A url")
-    # add URL, Hash?
-
-    # Search - Local
-    search = subparsers.add_parser(
-        "search", help="Search this machine for the specified topic"
-    )
-    search.add_argument("-f", "--filename", type=str, help="A file or folder name")
-    search.add_argument(
-        "-r", "--regex", action="store_true", help="The query is a regex pattern"
-    )
-    search.add_argument(
-        "-a",
-        "--find_all",
-        action="store_true",
-        help="Find all occurances (default is find first)",
-    )
-    search.add_argument(
-        "-i",
-        "--insensitive",
-        action="store_true",
-        help="Search case insensitive (default is case sensitive)",
-    )
-    # Filename, Hash, registrykey?
-
-    # Tools - Local
-    tools = subparsers.add_parser("tools", help="Use tools to perform a function")
-    tools.add_argument(
-        "-url",
-        "--url_unwrap",
-        type=str,
-        help="A URL to unwrap (remove safelinks and protectlinks)",
-    )
-    tools.add_argument(
-        "-cmd",
-        "--cmdhistory",
-        action="store_true",
-        help="Gathers the available command history to the current directory",
-    )
-    tools.add_argument(
-        "-browsers",
-        "--browserhistory",
-        action="store_true",
-        help="Gathers the available browser history, etc to the current directory",
-    )
-    tools.add_argument(
-        "-u",
-        "--user",
-        type=str,
-        default="~",
-        help="The user's name to use. Default is current user.",
-    )
-    tools.add_argument(
-        "-r",
-        "--regex",
-        action="store_true",
-        help="Launch a regex testing environment.",
-    )
-    tools.add_argument(
-        "-c",
-        "--csvs",
-        type=int,
-        default=0,
-        help="Combine the last X modified csvs in the current directory. Enter 1 for walkthrough",
-    )
-
+    parser = build_parser()
     args = parser.parse_args()
 
     #################
@@ -644,11 +799,11 @@ def main():
     #################
 
     verbosity = args.verbosity
-    with suppress(AttributeError):
-        case_insensitive = args.insensitive
-        is_regex = args.regex
-        find_all = args.find_all
-        user = args.user
+    # with suppress(AttributeError):
+    #     case_insensitive = args.insensitive
+    #     is_regex = args.regex
+    #     find_all = args.find_all
+    #     user = args.user
 
     ############
     ## Config ##

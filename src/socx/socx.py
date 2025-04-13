@@ -2,7 +2,6 @@
 
 from contextlib import suppress
 
-
 try:
     import argparse
     import os
@@ -31,12 +30,13 @@ or
     )
     exit(1)
 
-#############
-# Constants #
-#############
+
+###########################
+# Constants and Variables #
+###########################.
 
 PROGRAM_NAME = "socx"
-VERSION = 1.1
+VERSION = "2.1.1"
 ABOUT = f"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -47,7 +47,6 @@ ABOUT = f"""
 Version: {VERSION}
 A tool to assist with day to day activites in a security operations center (pronounced "socks")
 """
-
 USAGE = f"""Usage:
     {PROGRAM_NAME} [universal options] [function] [options]
     python {PROGRAM_NAME}.py [universal options] [function] [options]
@@ -60,24 +59,17 @@ Examples:
     {PROGRAM_NAME} search -f filename.txt -i
     {PROGRAM_NAME} search -f fold.*name -r
     {PROGRAM_NAME} tools --url_unwrap "https://urldefense.com/v3/__https:/..."
-    
 """
-
-#############
-# Variables #
-#############
-
 verbosity = 1
-
 environmental_variables = {
     "InsightVMAPI_BASE_URL": "",
     "InsightVMAPI_KEY": "",
     "VirusTotalAPI_KEY": "",
 }
 
-##################
+# ----------------#
 # Util Functions #
-##################
+# ----------------#
 
 
 def p(*args_, v=1, end="\n", sep=" ", file=None):
@@ -101,7 +93,13 @@ def search(pattern, string, case_insensitive):
         return re.search(pattern, string)
 
 
-def find_file(filename, directory=os.getcwd(), find_all=False):
+def find_file(
+    filename,
+    directory=os.getcwd(),
+    is_regex=False,
+    case_insensitive=True,
+    find_all=False,
+):
     files_found = []
     filename_copy = filename
     if case_insensitive and not is_regex:
@@ -111,7 +109,7 @@ def find_file(filename, directory=os.getcwd(), find_all=False):
             r_files = [
                 os.path.join(root, file)
                 for file in files + dirs
-                if search(filename, file)
+                if search(filename, file, case_insensitive)
             ]
             if find_all:
                 files_found.extend(r_files)
@@ -126,7 +124,6 @@ def find_file(filename, directory=os.getcwd(), find_all=False):
                     files_found.append(os.path.join(root, filename_copy))
                 else:
                     return os.path.join(root, filename_copy)
-
     if find_all:
         return files_found
     else:
@@ -134,7 +131,6 @@ def find_file(filename, directory=os.getcwd(), find_all=False):
 
 
 def print_ip_info(ip):
-    """Input IP address and prints whois on it"""
     url = f"https://whois.arin.net/rest/ip/{ip}"
     ip_xml = requests.request("GET", url=url).text
     namespaces = {"ns": "https://www.arin.net/whoisrws/core/v1"}
@@ -146,7 +142,6 @@ def print_ip_info(ip):
     org_country = root.find("ns:iso3166-1/ns:name", namespaces).text
     org_handle = root.find("ns:handle", namespaces).text
     registration_date = root.find("ns:registrationDate", namespaces).text
-
     print(f"(whois) Organization: {org_name}")
     print(f"(whois) Country: {org_country}")
     print(f"(whois) City: {org_city}")
@@ -202,14 +197,12 @@ def do_ip_info(ip):
         print(f"Hostname: {hostname}")
     except Exception as e:
         p(f"Hostname: Error - {e}", v=1)
-    # WINDOWS SPECIFIC
     ping_response = os.system(f"ping -n 1 {ip} > nul")
     if ping_response == 0:
         print(f"Ping: {ip} is up")
     else:
         print(f"Ping: {ip} is down")
     print_ip_info(ip)
-    # Rapid7
     if (
         get_enironmental_variable("InsightVMAPI_BASE_URL") != ""
         and get_enironmental_variable("InsightVMAPI_KEY") != ""
@@ -233,21 +226,17 @@ def do_domain_info(domain):
         print(f"IP: {ip}")
     except Exception as e:
         p(f"IP: Error - {e}", v=1)
-    # WINDOWS SPECIFIC
     ping_response = os.system(f"ping -n 1 {domain} > nul")
     if ping_response == 0:
         print(f"Ping: {domain} is up")
     else:
         print(f"Ping: {domain} is down")
-
     print_ip_info(ip)
     print(f"Whois record: https://www.whois.com/whois/{domain}")
 
 
 def do_url_info(url):
     url = unwrap_url(url)
-
-    # Virus total post url
     vt_api_key = get_enironmental_variable("VirusTotalAPI_KEY")
     vt_report_url = ""
     if vt_api_key != "":
@@ -258,10 +247,7 @@ def do_url_info(url):
             data={"url": url},
         )
         vt_report_url = response.json()["data"]["links"]["self"]
-
     p(f"Getting information on {url} (unwrapped)", v=1)
-
-    # Virus total get url
     if vt_api_key != "":
         p("Waiting for Virustotal to process..", v=3)
         for seconds in [5, 7, 10, 15]:
@@ -279,16 +265,27 @@ def do_url_info(url):
                 break
 
 
-def do_filename_search(filename):
+def do_filename_search(filename, find_all=False, is_regex=False, case_insensitive=True):
     p(f"Searching for {filename}", v=1)
     if case_insensitive:
         p("Performing case insensitive search", v=3)
     if find_all:
         p("Finding all occurances", v=3)
-    # WINDOWS SPECIFIC
     if find_all:
-        result = find_file(filename, "C:\\", True)
-        result = result + find_file(filename, "D:\\", True)
+        result = find_file(
+            filename,
+            "C:\\",
+            is_regex=is_regex,
+            find_all=find_all,
+            case_insensitive=case_insensitive,
+        )
+        result = result + find_file(
+            filename,
+            "D:\\",
+            is_regex=is_regex,
+            find_all=find_all,
+            case_insensitive=case_insensitive,
+        )
         result = set(result)
         if len(result) == 0:
             print("File/Folder not found")
@@ -315,7 +312,7 @@ def do_url_unwrap(url):
     p("\n", v=3)
 
 
-def do_browser_history():
+def do_browser_history(user="~"):
     p("Gathering browser history. Will output to cwd", v=3)
     p(
         "You may want to close the browser before running this, otherwise you may get 'database is locked' errors",
@@ -390,7 +387,6 @@ def do_browser_history():
                             table = i[0]
                             df = pd.read_sql(f"SELECT * FROM {table}", con)
                             df.to_csv(f"{browser['browser']}/{table}.csv")
-
                         con.close()
                     except Exception as e:
                         p(f"Error with {name} - {e}", v=3)
@@ -402,7 +398,6 @@ def do_combine_csvs(count=0):
     paths = sorted(Path().iterdir(), key=os.path.getmtime)
     paths.reverse()
     csvs = count
-
     if csvs < 2:
         accum = 1
         p("File Paths", v=3)
@@ -411,8 +406,6 @@ def do_combine_csvs(count=0):
                 p(f"{accum} - {path}")
                 accum += 1
         csvs = int(input("Enter the index of the last CSV to include:"))
-
-    # Get File Paths
     file_paths = []
     for path in paths:
         if str(path).endswith(".csv"):
@@ -430,10 +423,9 @@ def do_combine_csvs(count=0):
     p("Outputed to COMBINED_FILE.csv", v=3)
 
 
-def do_command_history():
+def do_command_history(user="~"):
     p("Gathering command history. Will output to cwd.", v=3)
     cwd = os.getcwd()
-    # Windows specific
     cmd_history_path = (
         os.path.expanduser(user)
         + "/AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt"
@@ -445,18 +437,24 @@ def do_command_history():
     p("Command history gathered", v=3)
 
 
-##############################
-# Function and Argument List #
-##############################
+#############
+# Arguments #
+#############
 
-# Centralized function definitions
 FUNCTIONS = [
     {
         "name": "Edit SOCX Config",
         "command": "config",
-        "function": lambda: do_config(),  # Wrap in lambda to handle no args
+        "function": lambda: do_config(),
         "arguments": [],
         "category": "config",
+    },
+    {
+        "name": "Interactive mode",
+        "command": "interactive",
+        "function": lambda: interactive_mode(),
+        "arguments": [],
+        "category": "interactive",
     },
     {
         "name": "Combine CSVs",
@@ -466,6 +464,7 @@ FUNCTIONS = [
             {
                 "name": "count",
                 "flag": "--csvs",
+                "short_flag": "-c",
                 "prompt": "Enter number of CSVs to combine (1 for walkthrough): ",
                 "type": int,
                 "default": 0,
@@ -483,6 +482,7 @@ FUNCTIONS = [
             {
                 "name": "url",
                 "flag": "--url",
+                "short_flag": "-u",
                 "prompt": "Enter the URL: ",
                 "type": str,
                 "required": True,
@@ -499,6 +499,7 @@ FUNCTIONS = [
             {
                 "name": "url",
                 "flag": "--url",
+                "short_flag": "-u",
                 "prompt": "Enter the URL: ",
                 "type": str,
                 "required": True,
@@ -515,6 +516,7 @@ FUNCTIONS = [
             {
                 "name": "domain",
                 "flag": "--domain",
+                "short_flag": "-d",
                 "prompt": "Enter the domain: ",
                 "type": str,
                 "required": True,
@@ -531,6 +533,7 @@ FUNCTIONS = [
             {
                 "name": "ip",
                 "flag": "--ip",
+                "short_flag": "-ip",
                 "prompt": "Enter the IP: ",
                 "type": str,
                 "required": True,
@@ -547,6 +550,7 @@ FUNCTIONS = [
             {
                 "name": "filename",
                 "flag": "--filename",
+                "short_flag": "-f",
                 "prompt": "Enter the file's name: ",
                 "type": str,
                 "required": True,
@@ -555,6 +559,7 @@ FUNCTIONS = [
             {
                 "name": "is_regex",
                 "flag": "--regex",
+                "short_flag": "-r",
                 "prompt": "Use regex pattern? (y/n): ",
                 "type": bool,
                 "action": "store_true",
@@ -565,6 +570,7 @@ FUNCTIONS = [
             {
                 "name": "find_all",
                 "flag": "--find_all",
+                "short_flag": "-a",
                 "prompt": "Find all occurrences? (y/n): ",
                 "type": bool,
                 "action": "store_true",
@@ -575,6 +581,7 @@ FUNCTIONS = [
             {
                 "name": "case_insensitive",
                 "flag": "--insensitive",
+                "short_flag": "-i",
                 "prompt": "Case insensitive search? (y/n): ",
                 "type": bool,
                 "action": "store_true",
@@ -593,6 +600,7 @@ FUNCTIONS = [
             {
                 "name": "user",
                 "flag": "--user",
+                "short_flag": "-U",
                 "prompt": "Enter the user's name (~ for current): ",
                 "type": str,
                 "default": "~",
@@ -610,6 +618,7 @@ FUNCTIONS = [
             {
                 "name": "user",
                 "flag": "--user",
+                "short_flag": "-U",
                 "prompt": "Enter the user's name (~ for current): ",
                 "type": str,
                 "default": "~",
@@ -627,22 +636,15 @@ FUNCTIONS = [
 
 
 def interactive_mode():
-    # Display menu
     for index, func in enumerate(FUNCTIONS):
         print(f"{index}: {func['name']}")
-
-    # Get user's choice
     try:
         index = int(input("Enter the number of the function to perform: "))
         selected = FUNCTIONS[index]
     except (ValueError, IndexError):
         print("Invalid choice.")
         return
-
-    # Initialize kwargs
     kwargs = {}
-
-    # Prompt for required arguments
     required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
     for arg in required_args:
         while True:
@@ -655,8 +657,6 @@ def interactive_mode():
                 break
             except (ValueError, TypeError):
                 print(f"Invalid value for {arg['name']}. Please try again.")
-
-    # Display optional arguments
     optional_args = [
         arg for arg in selected["arguments"] if not arg.get("required", False)
     ]
@@ -667,13 +667,9 @@ def interactive_mode():
                 print(f"'{arg['flag']}' : {arg['help']}")
             else:
                 print(f"'{arg['flag']} value' : {arg['help']}")
-
-        # Get optional arguments as a single input string
         arguments = input(
             "Enter optional arguments (e.g., --flag --flag2 value): "
         ).strip()
-
-        # Parse the input string
         if arguments:
             tokens = arguments.split()
             i = 0
@@ -686,7 +682,6 @@ def interactive_mode():
                     print(f"Warning: Unknown flag '{flag}' ignored.")
                     i += 1
                     continue
-
                 if arg_def.get("action") == "store_true":
                     kwargs[arg_def["name"]] = True
                     i += 1
@@ -708,25 +703,23 @@ def interactive_mode():
                         )
                         kwargs[arg_def["name"]] = arg_def.get("default")
                         i += 2
-
-    # Set defaults for any optional arguments not provided
     for arg in optional_args:
         if arg["name"] not in kwargs:
             if arg.get("action") == "store_true":
                 kwargs[arg["name"]] = False
             else:
                 kwargs[arg["name"]] = arg.get("default")
-
-    # Call the function
     try:
         selected["function"](**kwargs)
     except TypeError as e:
         print(f"Error calling function: {e}")
 
 
-####################
-# Argument Parsing #
-####################
+###################
+# Parse Arguments #
+###################
+
+
 def build_parser():
     parser = argparse.ArgumentParser(prog=PROGRAM_NAME, description=ABOUT, usage=USAGE)
     parser.add_argument(
@@ -737,29 +730,21 @@ def build_parser():
         help="Verbosity level, 0 for quiet, 5 for very verbose",
     )
     subparsers = parser.add_subparsers(dest="function", help="Function to perform")
-
-    # Group functions by category
     categories = {
         "config": subparsers.add_parser("config", help="Configuration functions"),
         "info": subparsers.add_parser("info", help="Gather information"),
         "search": subparsers.add_parser("search", help="Search this machine"),
         "tools": subparsers.add_parser("tools", help="Utility tools"),
     }
-
-    # Collect unique arguments per category
     for category in categories:
         category_parser = categories[category]
-        # Get all functions in this category
         category_functions = [f for f in FUNCTIONS if f["category"] == category]
-        # Collect unique arguments
         arg_set = {}
         for func in category_functions:
             for arg in func.get("arguments", []):
                 flag = arg["flag"]
                 if flag not in arg_set:
                     arg_set[flag] = arg
-
-        # Add unique arguments to the subparser
         for flag, arg in arg_set.items():
             kwargs = {
                 "help": arg.get("help", ""),
@@ -768,9 +753,15 @@ def build_parser():
                 kwargs["action"] = arg["action"]
             else:
                 kwargs["type"] = arg.get("type", str)
-                kwargs["default"] = arg.get("default")
-            category_parser.add_argument(flag, **kwargs)
-
+                if arg.get("required", False):
+                    kwargs["required"] = True
+                else:
+                    kwargs["default"] = arg.get("default")
+            # Use both short and long flags
+            flags = [arg["flag"]]
+            if arg.get("short_flag"):
+                flags.insert(0, arg["short_flag"])  # Short flag first
+            category_parser.add_argument(*flags, **kwargs)
     return parser
 
 
@@ -780,74 +771,46 @@ def build_parser():
 
 
 def main():
-    global verbosity
-    global environmental_variables
-    global case_insensitive
-    global is_regex
-    global find_all
-    global user
-
-    ###################
-    # Parse Arguments #
-    ###################
+    global verbosity, environmental_variables
 
     parser = build_parser()
     args = parser.parse_args()
 
-    #################
-    # Set Variables #
-    #################
-
     verbosity = args.verbosity
-    # with suppress(AttributeError):
-    #     case_insensitive = args.insensitive
-    #     is_regex = args.regex
-    #     find_all = args.find_all
-    #     user = args.user
 
-    ############
-    ## Config ##
-    ############
+    for func in FUNCTIONS:
+        if func["category"] == args.function:
+            # For 'info' and 'tools', check which specific command matches
+            if func["command"] == "ip_info" and args.ip:
+                selected = func
+                break
 
-    if args.function == "config":
-        do_config()
+    # if args.function == "config":
+    #     do_config()
 
-    ##########
-    ## Info ##
-    ##########
+    # elif args.function == "info":
+    #     if args.ip:
+    #         do_ip_info(args.ip)
+    #     elif args.domain:
+    #         do_domain_info(args.domain)
+    #     elif args.url:
+    #         do_url_info(args.url)
 
-    if args.function == "info":
-        if args.ip:
-            do_ip_info(args.ip)
-        elif args.domain:
-            do_domain_info(args.domain)
-        elif args.url:
-            do_url_info(args.url)
+    # elif args.function == "search":
+    #     if args.filename:
+    #         do_filename_search(
+    #             args.filename, args.find_all, args.regex, args.insensitive
+    #         )
 
-    ############
-    ## Search ##
-    ############
-
-    if args.function == "search":
-        if args.filename:
-            do_filename_search(args.filename)
-
-    ###########
-    ## Tools ##
-    ###########
-    if args.function == "tools":
-        # Test Link: https://urldefense.com/v3/__https:/conferences.stjude.org/g87vv8?i=2NejfAgCkki403xbcRpHuw&locale=en-US__;!!NfcMrC8AwgI!cq3afLDXviFyix2KeJ62VsQBrrZOgfyZu1fks7uQorRGX6VOgcDaUgTpxFdJRmXMdtU5zsmZB9PUw-TmquYgbIGIYUDPsQ$
-        if args.url_unwrap:
-            do_url_unwrap(args.url_unwrap)
-
-        elif args.browserhistory:
-            do_browser_history()
-
-        elif args.csvs:
-            do_combine_csvs(args.csvs)
-
-        elif args.cmdhistory:
-            do_command_history()
+    # elif args.function == "tools":
+    #     if args.url:
+    #         do_url_unwrap(args.url)
+    #     elif args.browser_history:
+    #         do_browser_history(args.user)
+    #     elif args.csvs:
+    #         do_combine_csvs(args.csvs)
+    #     elif args.cmd_history:
+    #         do_command_history(args.user)
 
     if not args.function:
         print(ABOUT)

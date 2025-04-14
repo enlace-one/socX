@@ -37,7 +37,7 @@ def test_unwrap_url():
 def test_domain_info():
     test_domain = "google.com"
     output = run(
-        f"info --d '{test_domain}' ",
+        f"info -d '{test_domain}' ",
     )
     assert output.stderr == b""
     assert "Getting information on google.com" in str(output.stdout)

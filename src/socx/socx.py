@@ -48,17 +48,18 @@ Version: {VERSION}
 A tool to assist with day to day activites in a security operations center (pronounced "socks")
 """
 USAGE = f"""Usage:
-    {PROGRAM_NAME} [universal options] [function] [options]
-    python {PROGRAM_NAME}.py [universal options] [function] [options]
+    {PROGRAM_NAME} [universal options] [function] [arguments]
+    python {PROGRAM_NAME}.py [universal options] [function] [arguments]
         
 Examples:
     {PROGRAM_NAME} --help
     {PROGRAM_NAME} info -h
     {PROGRAM_NAME} info -ip 1.2.3.4
     {PROGRAM_NAME} -v 3 info -d google.com
-    {PROGRAM_NAME} search -f filename.txt -i
-    {PROGRAM_NAME} search -f fold.*name -r
-    {PROGRAM_NAME} tools --url_unwrap "https://urldefense.com/v3/__https:/..."
+    {PROGRAM_NAME} find -f filename.txt -i
+    {PROGRAM_NAME} find -f fold.*name -r
+    {PROGRAM_NAME} unwrap --url "https://urldefense.com/v3/__https:/..."
+    {PROGRAM_NAME} combine --csvs 5
 """
 verbosity = 1
 environmental_variables = {
@@ -102,6 +103,7 @@ def find_file(
 ):
     files_found = []
     filename_copy = filename
+    p(f"Starting file search in {directory}", v=5)
     if case_insensitive and not is_regex:
         filename = filename.lower()
     for root, dirs, files in os.walk(directory):
@@ -276,7 +278,14 @@ def do_info(**kwargs):
         print("Error: you must provide a valid argument")
 
 
-def do_filename_search(filename, find_all=False, is_regex=False, case_insensitive=True):
+def do_filename_search(
+    filename,
+    directory=os.getcwd(),
+    find_all=False,
+    is_regex=False,
+    case_insensitive=True,
+    smart=True,
+):
     p(f"Searching for {filename}", v=1)
     if case_insensitive:
         p("Performing case insensitive search", v=3)
@@ -285,14 +294,14 @@ def do_filename_search(filename, find_all=False, is_regex=False, case_insensitiv
     if find_all:
         result = find_file(
             filename,
-            "C:\\",
+            directory="C:\\",
             is_regex=is_regex,
             find_all=find_all,
             case_insensitive=case_insensitive,
         )
-        result = result + find_file(
+        result += find_file(
             filename,
-            "D:\\",
+            directory="D:\\",
             is_regex=is_regex,
             find_all=find_all,
             case_insensitive=case_insensitive,
@@ -304,12 +313,20 @@ def do_filename_search(filename, find_all=False, is_regex=False, case_insensitiv
             for file in result:
                 print(f"File/Folder found at {file}")
     else:
-        result = find_file(filename, os.path.dirname(os.getcwd()))
+        result = find_file(
+            filename,
+            directory=directory,
+            is_regex=is_regex,
+            case_insensitive=case_insensitive,
+        )
         if result is None:
+            p("File not found in provided directory, checking user directory..", v=2)
             result = find_file(filename, os.path.expanduser("~"))
         if result is None:
+            p("File not found in user directory, checking C:\ ..", v=2)
             result = find_file(filename, "C:\\")
         if result is None:
+            p("File not found in C: directory, checking D:\ ..", v=2)
             result = find_file(filename, "D:\\")
         if result is None:
             print("File/Folder not found")
@@ -403,10 +420,10 @@ def do_browser_history(user="~"):
                         p(f"Error with {name} - {e}", v=3)
 
 
-def do_combine_csvs(csvs=0):
+def do_combine_csvs(csvs=0, skip_og_filename_column=False, directory=os.getcwd()):
     p("Starting combine CSVs", v=5)
     p("The current directory will be used to find the CSVs.", v=1)
-    paths = sorted(Path().iterdir(), key=os.path.getmtime)
+    paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
     paths.reverse()
     if csvs < 2:
         accum = 1
@@ -427,6 +444,8 @@ def do_combine_csvs(csvs=0):
     dfs = []
     for path in file_paths:
         df = pd.read_csv(path)
+        if not skip_og_filename_column:
+            df["Original CSV Filename"] = os.path.basename(path)
         dfs.append(df)
     df = pd.concat(dfs)
     df.to_csv("COMBINED_FILE.csv", index=False)
@@ -481,7 +500,25 @@ FUNCTIONS = [
                 "default": 0,
                 "required": False,
                 "help": "Combine the last X modified CSVs in the current directory. Enter 1 for walkthrough",
-            }
+            },
+            {
+                "name": "directory",
+                "flag": "--directory",
+                "short_flag": "-d",
+                "type": str,
+                "default": os.getcwd(),
+                "required": False,
+                "help": "The directory to use, defaults to cwd",
+            },
+            {
+                "name": "skip_og_filename_column",
+                "flag": "--skip_og_filename_column",
+                "short_flag": "-sname",
+                "type": bool,
+                "default": False,
+                "required": False,
+                "help": "Include a column with the OG file name",
+            },
         ],
     },
     {
@@ -586,6 +623,24 @@ FUNCTIONS = [
                 "default": False,
                 "required": False,
                 "help": "Search case insensitive (default is case sensitive)",
+            },
+            {
+                "name": "directory",
+                "flag": "--directory",
+                "short_flag": "-d",
+                "type": str,
+                "default": os.getcwd(),
+                "required": False,
+                "help": "The directory to use, defaults to cwd",
+            },
+            {
+                "name": "smart",
+                "flag": "--smart",
+                "short_flag": "-s",
+                "type": bool,
+                "default": True,
+                "required": False,
+                "help": "Do smart search (try directory then user folder then C: then D:)",
             },
         ],
     },
@@ -818,6 +873,7 @@ def main():
 
     # Call the function
     try:
+        p(f"Calling {selected['function'].__name__} with {kwargs}", v=5)
         selected["function"](**kwargs)
     except TypeError as e:
         print(f"Error calling function '{selected['name']}': {e}")

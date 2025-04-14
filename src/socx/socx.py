@@ -158,7 +158,7 @@ def get_enironmental_variable(name):
 
 #####################
 # Primary Functions #
-#####################
+#####################.
 
 
 def do_config():
@@ -439,7 +439,7 @@ def do_command_history(user="~"):
 
 #############
 # Arguments #
-#############
+#############.
 
 FUNCTIONS = [
     {
@@ -458,11 +458,11 @@ FUNCTIONS = [
     },
     {
         "name": "Combine CSVs",
-        "command": "combine_csvs",
+        "command": "combine",
         "function": do_combine_csvs,
         "arguments": [
             {
-                "name": "count",
+                "name": "csvs",
                 "flag": "--csvs",
                 "short_flag": "-c",
                 "prompt": "Enter number of CSVs to combine (1 for walkthrough): ",
@@ -472,11 +472,11 @@ FUNCTIONS = [
                 "help": "Combine the last X modified CSVs in the current directory. Enter 1 for walkthrough",
             }
         ],
-        "category": "tools",
+        "category": "combine",
     },
     {
         "name": "Unwrap a URLDefense URL",
-        "command": "url_unwrap",
+        "command": "unwrap",
         "function": do_url_unwrap,
         "arguments": [
             {
@@ -487,13 +487,13 @@ FUNCTIONS = [
                 "type": str,
                 "required": True,
                 "help": "A URL to unwrap (remove safelinks and protectlinks)",
-            }
+            },
         ],
-        "category": "tools",
+        "category": "unwrap",
     },
     {
         "name": "Get info on a URL",
-        "command": "url_info",
+        "command": "url",
         "function": do_url_info,
         "arguments": [
             {
@@ -510,7 +510,7 @@ FUNCTIONS = [
     },
     {
         "name": "Get info on a domain",
-        "command": "domain_info",
+        "command": "domain",
         "function": do_domain_info,
         "arguments": [
             {
@@ -527,7 +527,7 @@ FUNCTIONS = [
     },
     {
         "name": "Get info on an IP",
-        "command": "ip_info",
+        "command": "ip",
         "function": do_ip_info,
         "arguments": [
             {
@@ -544,7 +544,7 @@ FUNCTIONS = [
     },
     {
         "name": "Find a file",
-        "command": "filename_search",
+        "command": "filename",
         "function": do_filename_search,
         "arguments": [
             {
@@ -632,7 +632,7 @@ FUNCTIONS = [
 
 ####################
 # Interactive Mode #
-####################
+####################.
 
 
 def interactive_mode():
@@ -717,7 +717,7 @@ def interactive_mode():
 
 ###################
 # Parse Arguments #
-###################
+###################.
 
 
 def build_parser():
@@ -730,8 +730,12 @@ def build_parser():
         help="Verbosity level, 0 for quiet, 5 for very verbose",
     )
     subparsers = parser.add_subparsers(dest="function", help="Function to perform")
+
+    # Categories
+    category_set = set([f["category"] for f in FUNCTIONS])
+
     categories = {
-        "config": subparsers.add_parser("config", help="Configuration functions"),
+        cat: subparsers.add_parser(cat, help="Configuration functions"),
         "info": subparsers.add_parser("info", help="Gather information"),
         "search": subparsers.add_parser("search", help="Search this machine"),
         "tools": subparsers.add_parser("tools", help="Utility tools"),
@@ -754,7 +758,8 @@ def build_parser():
             else:
                 kwargs["type"] = arg.get("type", str)
                 if arg.get("required", False):
-                    kwargs["required"] = True
+                    pass
+                    # kwargs["required"] = True
                 else:
                     kwargs["default"] = arg.get("default")
             # Use both short and long flags
@@ -767,7 +772,7 @@ def build_parser():
 
 ########
 # Main #
-########
+########.
 
 
 def main():
@@ -778,12 +783,43 @@ def main():
 
     verbosity = args.verbosity
 
+    if not args.function:
+        print(ABOUT)
+        print(USAGE)
+        print(f"You did not provide a function for {PROGRAM_NAME} to do. ")
+        if "y" in input("Would you like to Enter interactive mode? (y/n): ").lower():
+            interactive_mode()
+            return
+
     for func in FUNCTIONS:
         if func["category"] == args.function:
             # For 'info' and 'tools', check which specific command matches
-            if func["command"] == "ip_info" and args.ip:
+            if func["command"] == func["category"]:
                 selected = func
                 break
+            if hasattr(args, func["command"]):
+                print(args, "has", func["command"], getattr(args, func["command"]))
+                selected = func
+                break
+    kwargs = {}
+    for arg in selected["arguments"]:
+        arg_name = arg["name"]
+        arg_value = getattr(args, arg_name, None)
+        if arg.get("required", False) and arg_value is None:
+            print(f"Missing required argument: {arg['flag']}")
+            return
+        kwargs[arg_name] = arg_value if arg_value is not None else arg.get("default")
+
+    # Call the function
+    if selected:
+        try:
+            selected["function"](**kwargs)
+        except TypeError as e:
+            print(f"Error calling function '{selected['name']}': {e}")
+    else:
+        print(f"Invalid function or missing required arguments for '{args.function}'.")
+        print(USAGE)
+        return
 
     # if args.function == "config":
     #     do_config()
@@ -811,13 +847,6 @@ def main():
     #         do_combine_csvs(args.csvs)
     #     elif args.cmd_history:
     #         do_command_history(args.user)
-
-    if not args.function:
-        print(ABOUT)
-        print(USAGE)
-        print(f"You did not provide a function for {PROGRAM_NAME} to do. ")
-        if "y" in input("Would you like to Enter interactive mode? (y/n): ").lower():
-            interactive_mode()
 
 
 if __name__ == "__main__":

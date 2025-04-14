@@ -265,6 +265,17 @@ def do_url_info(url):
                 break
 
 
+def do_info(**kwargs):
+    if "ip" in kwargs:
+        return do_ip_info(kwargs["ip"])
+    elif "domain" in kwargs:
+        return do_domain_info(kwargs["domain"])
+    elif "url" in kwargs:
+        return do_url_info(kwargs["url"])
+    else:
+        print("Error: you must provide a valid argument")
+
+
 def do_filename_search(filename, find_all=False, is_regex=False, case_insensitive=True):
     p(f"Searching for {filename}", v=1)
     if case_insensitive:
@@ -392,12 +403,11 @@ def do_browser_history(user="~"):
                         p(f"Error with {name} - {e}", v=3)
 
 
-def do_combine_csvs(count=0):
+def do_combine_csvs(csvs=0):
     p("Starting combine CSVs", v=5)
     p("The current directory will be used to find the CSVs.", v=1)
     paths = sorted(Path().iterdir(), key=os.path.getmtime)
     paths.reverse()
-    csvs = count
     if csvs < 2:
         accum = 1
         p("File Paths", v=3)
@@ -445,20 +455,21 @@ FUNCTIONS = [
     {
         "name": "Edit SOCX Config",
         "command": "config",
+        "help": "",
         "function": lambda: do_config(),
         "arguments": [],
-        "category": "config",
     },
     {
         "name": "Interactive mode",
         "command": "interactive",
+        "help": "",
         "function": lambda: interactive_mode(),
         "arguments": [],
-        "category": "interactive",
     },
     {
         "name": "Combine CSVs",
         "command": "combine",
+        "help": "",
         "function": do_combine_csvs,
         "arguments": [
             {
@@ -472,11 +483,11 @@ FUNCTIONS = [
                 "help": "Combine the last X modified CSVs in the current directory. Enter 1 for walkthrough",
             }
         ],
-        "category": "combine",
     },
     {
         "name": "Unwrap a URLDefense URL",
         "command": "unwrap",
+        "help": "",
         "function": do_url_unwrap,
         "arguments": [
             {
@@ -492,9 +503,11 @@ FUNCTIONS = [
         "category": "unwrap",
     },
     {
-        "name": "Get info on a URL",
-        "command": "url",
-        "function": do_url_info,
+        "name": "Get info on a URL, domain, or ip",
+        "command": "info",
+        "help": "",
+        "function": do_info,
+        "rules": {"require_one_of": ["url", "domain", "ip"]},
         "arguments": [
             {
                 "name": "url",
@@ -504,15 +517,7 @@ FUNCTIONS = [
                 "type": str,
                 "required": True,
                 "help": "A URL to get info on",
-            }
-        ],
-        "category": "info",
-    },
-    {
-        "name": "Get info on a domain",
-        "command": "domain",
-        "function": do_domain_info,
-        "arguments": [
+            },
             {
                 "name": "domain",
                 "flag": "--domain",
@@ -521,15 +526,7 @@ FUNCTIONS = [
                 "type": str,
                 "required": True,
                 "help": "A domain (e.g., google.com)",
-            }
-        ],
-        "category": "info",
-    },
-    {
-        "name": "Get info on an IP",
-        "command": "ip",
-        "function": do_ip_info,
-        "arguments": [
+            },
             {
                 "name": "ip",
                 "flag": "--ip",
@@ -538,13 +535,14 @@ FUNCTIONS = [
                 "type": str,
                 "required": True,
                 "help": "An IP address",
-            }
+            },
         ],
         "category": "info",
     },
     {
         "name": "Find a file",
-        "command": "filename",
+        "command": "find",
+        "help": "",
         "function": do_filename_search,
         "arguments": [
             {
@@ -590,11 +588,11 @@ FUNCTIONS = [
                 "help": "Search case insensitive (default is case sensitive)",
             },
         ],
-        "category": "search",
     },
     {
         "name": "Gather browser history",
         "command": "browser_history",
+        "help": "",
         "function": do_browser_history,
         "arguments": [
             {
@@ -608,11 +606,11 @@ FUNCTIONS = [
                 "help": "The user's name to use. Default is current user.",
             }
         ],
-        "category": "tools",
     },
     {
         "name": "Gather command history",
         "command": "cmd_history",
+        "help": "",
         "function": do_command_history,
         "arguments": [
             {
@@ -626,7 +624,6 @@ FUNCTIONS = [
                 "help": "The user's name to use. Default is current user.",
             }
         ],
-        "category": "tools",
     },
 ]
 
@@ -732,23 +729,18 @@ def build_parser():
     subparsers = parser.add_subparsers(dest="function", help="Function to perform")
 
     # Categories
-    category_set = set([f["category"] for f in FUNCTIONS])
-
     categories = {
-        cat: subparsers.add_parser(cat, help="Configuration functions"),
-        "info": subparsers.add_parser("info", help="Gather information"),
-        "search": subparsers.add_parser("search", help="Search this machine"),
-        "tools": subparsers.add_parser("tools", help="Utility tools"),
+        cat["command"]: subparsers.add_parser(cat["command"], help=cat["help"])
+        for cat in FUNCTIONS
     }
     for category in categories:
         category_parser = categories[category]
-        category_functions = [f for f in FUNCTIONS if f["category"] == category]
+        category_function = [f for f in FUNCTIONS if f["command"] == category][0]
         arg_set = {}
-        for func in category_functions:
-            for arg in func.get("arguments", []):
-                flag = arg["flag"]
-                if flag not in arg_set:
-                    arg_set[flag] = arg
+        for arg in category_function.get("arguments", []):
+            flag = arg["flag"]
+            if flag not in arg_set:
+                arg_set[flag] = arg
         for flag, arg in arg_set.items():
             kwargs = {
                 "help": arg.get("help", ""),
@@ -758,8 +750,7 @@ def build_parser():
             else:
                 kwargs["type"] = arg.get("type", str)
                 if arg.get("required", False):
-                    pass
-                    # kwargs["required"] = True
+                    kwargs["required"] = True
                 else:
                     kwargs["default"] = arg.get("default")
             # Use both short and long flags
@@ -792,15 +783,14 @@ def main():
             return
 
     for func in FUNCTIONS:
-        if func["category"] == args.function:
-            # For 'info' and 'tools', check which specific command matches
-            if func["command"] == func["category"]:
-                selected = func
-                break
-            if hasattr(args, func["command"]):
-                print(args, "has", func["command"], getattr(args, func["command"]))
-                selected = func
-                break
+        if func["command"] == args.function:
+            selected = func
+            break
+    else:
+        print(f"Invalid function or missing required arguments for '{args.function}'.")
+        print(USAGE)
+        return
+
     kwargs = {}
     for arg in selected["arguments"]:
         arg_name = arg["name"]
@@ -808,18 +798,23 @@ def main():
         if arg.get("required", False) and arg_value is None:
             print(f"Missing required argument: {arg['flag']}")
             return
+        if selected.get("rules", {}).get("require_one_of", False):
+            require_one_of = selected["rules"]["require_one_of"]
+            count = 0
+            for a in require_one_of:
+                if hasattr(args, a):
+                    count += 1
+            if not count:
+                print(
+                    f"Error: You must provide one of these arguments: {', '.join(require_one_of)}"
+                )
         kwargs[arg_name] = arg_value if arg_value is not None else arg.get("default")
 
     # Call the function
-    if selected:
-        try:
-            selected["function"](**kwargs)
-        except TypeError as e:
-            print(f"Error calling function '{selected['name']}': {e}")
-    else:
-        print(f"Invalid function or missing required arguments for '{args.function}'.")
-        print(USAGE)
-        return
+    try:
+        selected["function"](**kwargs)
+    except TypeError as e:
+        print(f"Error calling function '{selected['name']}': {e}")
 
     # if args.function == "config":
     #     do_config()

@@ -515,7 +515,7 @@ FUNCTIONS = [
                 "short_flag": "-u",
                 "prompt": "Enter the URL: ",
                 "type": str,
-                "required": True,
+                "required": False,
                 "help": "A URL to get info on",
             },
             {
@@ -524,7 +524,7 @@ FUNCTIONS = [
                 "short_flag": "-d",
                 "prompt": "Enter the domain: ",
                 "type": str,
-                "required": True,
+                "required": False,
                 "help": "A domain (e.g., google.com)",
             },
             {
@@ -533,7 +533,7 @@ FUNCTIONS = [
                 "short_flag": "-ip",
                 "prompt": "Enter the IP: ",
                 "type": str,
-                "required": True,
+                "required": False,
                 "help": "An IP address",
             },
         ],
@@ -633,14 +633,17 @@ FUNCTIONS = [
 
 
 def interactive_mode():
+    # Get Function
     for index, func in enumerate(FUNCTIONS):
-        print(f"{index}: {func['name']}")
+        if func["command"] != "interactive":
+            print(f"{index}: {func['name']}")
     try:
         index = int(input("Enter the number of the function to perform: "))
         selected = FUNCTIONS[index]
     except (ValueError, IndexError):
         print("Invalid choice.")
         return
+    # Get Arguments
     kwargs = {}
     required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
     for arg in required_args:
@@ -704,9 +707,10 @@ def interactive_mode():
         if arg["name"] not in kwargs:
             if arg.get("action") == "store_true":
                 kwargs[arg["name"]] = False
-            else:
+            elif arg.get("default", False):
                 kwargs[arg["name"]] = arg.get("default")
     try:
+        p(f"Calling function with {kwargs}", v=5)
         selected["function"](**kwargs)
     except TypeError as e:
         print(f"Error calling function: {e}")
@@ -751,7 +755,7 @@ def build_parser():
                 kwargs["type"] = arg.get("type", str)
                 if arg.get("required", False):
                     kwargs["required"] = True
-                else:
+                elif arg.get("default", False):
                     kwargs["default"] = arg.get("default")
             # Use both short and long flags
             flags = [arg["flag"]]
@@ -794,11 +798,10 @@ def main():
     kwargs = {}
     for arg in selected["arguments"]:
         arg_name = arg["name"]
-        arg_value = getattr(args, arg_name, None)
-        if arg.get("required", False) and arg_value is None:
+        if arg.get("required", False) and getattr(args, arg_name, None) is None:
             print(f"Missing required argument: {arg['flag']}")
             return
-        if selected.get("rules", {}).get("require_one_of", False):
+        if selected.get("rules", {}).get("require_one_of", None) is not None:
             require_one_of = selected["rules"]["require_one_of"]
             count = 0
             for a in require_one_of:
@@ -808,7 +811,10 @@ def main():
                 print(
                     f"Error: You must provide one of these arguments: {', '.join(require_one_of)}"
                 )
-        kwargs[arg_name] = arg_value if arg_value is not None else arg.get("default")
+        if getattr(args, arg_name, None) is not None:
+            kwargs[arg_name] = getattr(args, arg_name)
+        elif getattr(arg, "default", None) is not None:
+            kwargs[arg_name] = getattr(arg, "default")
 
     # Call the function
     try:

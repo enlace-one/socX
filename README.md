@@ -4,6 +4,9 @@ A collection of helpful tools for a SOC analyst. Easily search for IPs, domains,
 ## Installing
 python -m pip install socx
 
+### Installing from QA
+python -m pip install --index-url https://test.pypi.org/simple/ socx
+
 ## Usage
 A tool to assist with day to day activites in a security operations center (pronounced "socks")      
 

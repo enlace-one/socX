@@ -5,15 +5,33 @@ A collection of helpful tools for a SOC analyst. Easily search for IPs, domains,
 python -m pip install socx
 
 ## Usage
-socx info -ip 1.2.3.4
+A tool to assist with day to day activites in a security operations center (pronounced "socks")      
 
-socx -v 3 info -d google.com
+Usage:
+    
+    socx [universal options] 
+    \[function] \[arguments]
 
-socx search -f filename.txt -i
+or
 
-socx search -f fold.*name -r
+    python socx.py [universal options] [function] [arguments]
 
-socx tools --url_unwrap "https://urldefense.com/v3/__https:/...
+Examples:
+    socx --help
+
+    socx info -h
+
+    socx info -ip 1.2.3.4
+
+    socx -v 3 info -d google.com
+
+    socx find -f filename.txt -i
+
+    socx find -f fold.*name -r
+
+    socx unwrap --url "https://urldefense.com/v3/__https:/..."
+
+    socx combine --csvs 5
 
 ## Other Information
 
@@ -24,9 +42,12 @@ or
 
 python -m pip install -i https://test.pypi.org/simple/ socx==0.0.3
 
+## Dev Info
+
 ### Uploading Python Package
 python -m build
 
+python -m twine upload --repository testpypi dist/*
+
 python -m twine upload dist/*
 
-python -m twine upload --repository testpypi dist/*

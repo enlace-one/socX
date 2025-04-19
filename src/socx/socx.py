@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from contextlib import suppress
+from unittest import skipUnless
 
 try:
     import argparse
@@ -36,6 +37,7 @@ or
 ###########################.
 
 PROGRAM_NAME = "socx"
+# Also change this in pyproject.toml
 VERSION = "2.1.1"
 ABOUT = f"""
    _____ ____  _______  __
@@ -283,9 +285,12 @@ def do_filename_search(
     directory=os.getcwd(),
     find_all=False,
     is_regex=False,
-    case_insensitive=True,
-    smart=True,
+    case_sensitive=False,
+    skip_smart=False,
 ):
+
+    case_insensitive = not case_sensitive
+
     p(f"Searching for {filename}", v=1)
     if case_insensitive:
         p("Performing case insensitive search", v=3)
@@ -312,6 +317,31 @@ def do_filename_search(
         else:
             for file in result:
                 print(f"File/Folder found at {file}")
+    elif not skip_smart:
+        for path in dict.fromkeys(
+            [
+                directory,
+                os.path.dirname(os.path.dirname(directory)),
+                os.path.expanduser("~"),
+                "C:\\",
+                "D:\\",
+            ]
+        ):
+            p(f"Checking {path}..", v=3)
+            result = find_file(
+                filename,
+                directory=path,
+                is_regex=is_regex,
+                case_insensitive=case_insensitive,
+            )
+            if result is None:
+                p(f"File not found in {path}..", v=2)
+            else:
+                break
+        if result is None:
+            print("File/Folder not found")
+        else:
+            print(f"File/Folder found at {result}")
     else:
         result = find_file(
             filename,
@@ -319,15 +349,6 @@ def do_filename_search(
             is_regex=is_regex,
             case_insensitive=case_insensitive,
         )
-        if result is None:
-            p("File not found in provided directory, checking user directory..", v=2)
-            result = find_file(filename, os.path.expanduser("~"))
-        if result is None:
-            p("File not found in user directory, checking C:\ ..", v=2)
-            result = find_file(filename, "C:\\")
-        if result is None:
-            p("File not found in C: directory, checking D:\ ..", v=2)
-            result = find_file(filename, "D:\\")
         if result is None:
             print("File/Folder not found")
         else:
@@ -614,10 +635,10 @@ FUNCTIONS = [
                 "help": "Find all occurrences (default is find first)",
             },
             {
-                "name": "case_insensitive",
-                "flag": "--insensitive",
+                "name": "case_sensitive",
+                "flag": "--sensitive",
                 "short_flag": "-i",
-                "prompt": "Case insensitive search? (y/n): ",
+                "prompt": "Case sensitive search? (y/n): ",
                 "type": bool,
                 "action": "store_true",
                 "default": False,
@@ -634,11 +655,11 @@ FUNCTIONS = [
                 "help": "The directory to use, defaults to cwd",
             },
             {
-                "name": "smart",
-                "flag": "--smart",
-                "short_flag": "-s",
+                "name": "skip_smart",
+                "flag": "--skip_smart",
+                "short_flag": "-ss",
                 "type": bool,
-                "default": True,
+                "default": False,
                 "required": False,
                 "help": "Do smart search (try directory then user folder then C: then D:)",
             },
@@ -700,18 +721,7 @@ def interactive_mode():
         return
     # Get Arguments
     kwargs = {}
-    required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
-    for arg in required_args:
-        while True:
-            value = input(arg["prompt"]).strip()
-            if not value:
-                print("This argument is required. Please provide a value.")
-                continue
-            try:
-                kwargs[arg["name"]] = arg["type"](value)
-                break
-            except (ValueError, TypeError):
-                print(f"Invalid value for {arg['name']}. Please try again.")
+
     optional_args = [
         arg for arg in selected["arguments"] if not arg.get("required", False)
     ]
@@ -764,6 +774,20 @@ def interactive_mode():
                 kwargs[arg["name"]] = False
             elif arg.get("default", False):
                 kwargs[arg["name"]] = arg.get("default")
+
+    required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
+    for arg in required_args:
+        while True:
+            value = input(arg["prompt"]).strip()
+            if not value:
+                print("This argument is required. Please provide a value.")
+                continue
+            try:
+                kwargs[arg["name"]] = arg["type"](value)
+                break
+            except (ValueError, TypeError):
+                print(f"Invalid value for {arg['name']}. Please try again.")
+
     try:
         p(f"Calling function with {kwargs}", v=5)
         selected["function"](**kwargs)
@@ -850,12 +874,18 @@ def main():
         print(USAGE)
         return
 
+    p(f"Raw Arguments: {args}", v=5)
     kwargs = {}
     for arg in selected["arguments"]:
+        arg_flag_name = arg["flag"].strip("-")
         arg_name = arg["name"]
-        if arg.get("required", False) and getattr(args, arg_name, None) is None:
+        p(f"Processing {arg_flag_name}", v=5)
+
+        # If arg is required and missing
+        if arg.get("required", False) and getattr(args, arg_flag_name, None) is None:
             print(f"Missing required argument: {arg['flag']}")
             return
+        # If arg has a require one of rule
         if selected.get("rules", {}).get("require_one_of", None) is not None:
             require_one_of = selected["rules"]["require_one_of"]
             count = 0
@@ -866,8 +896,10 @@ def main():
                 print(
                     f"Error: You must provide one of these arguments: {', '.join(require_one_of)}"
                 )
-        if getattr(args, arg_name, None) is not None:
-            kwargs[arg_name] = getattr(args, arg_name)
+        # If arg is present
+        if getattr(args, arg_flag_name, None) is not None:
+            kwargs[arg_name] = getattr(args, arg_flag_name)
+        # If arg has default and is not present
         elif getattr(arg, "default", None) is not None:
             kwargs[arg_name] = getattr(arg, "default")
 

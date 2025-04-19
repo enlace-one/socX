@@ -1,6 +1,6 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: socx
-Version: 0.0.10
+Version: 2.1
 Summary: A set of useful tools for a security operations center
 Author-email: Enlace <enlace.aman@gmail.com>
 Classifier: Programming Language :: Python :: 3
@@ -9,25 +9,55 @@ Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 
 # socx
-A collection of helpful tools for a soc analyst. Easily search for IPs, domains, and find files on the system.
+A collection of helpful tools for a SOC analyst. Easily search for IPs, domains, and find files on the system.
 
 ## Installing
 python -m pip install socx
 
 ## Usage
-socx info -ip 1.2.3.4
-socx -v 3 info -d google.com
-socx search -f filename.txt -i
-socx search -f fold.*name -r
-socx tools --url_unwrap "https://urldefense.com/v3/__https:/...
+A tool to assist with day to day activites in a security operations center (pronounced "socks")      
+
+Usage:
+    
+    socx [universal options] 
+    \[function] \[arguments]
+
+or
+
+    python socx.py [universal options] [function] [arguments]
+
+Examples:
+    socx --help
+
+    socx info -h
+
+    socx info -ip 1.2.3.4
+
+    socx -v 3 info -d google.com
+
+    socx find -f filename.txt -i
+
+    socx find -f fold.*name -r
+
+    socx unwrap --url "https://urldefense.com/v3/__https:/..."
+
+    socx combine --csvs 5
 
 ## Other Information
 
 ### Install Testing Version
 python -m pip install --index-url https://test.pypi.org/simple/ --no-deps socx
+
 or 
+
 python -m pip install -i https://test.pypi.org/simple/ socx==0.0.3
+
+## Dev Info
 
 ### Uploading Python Package
 python -m build
+
 python -m twine upload --repository testpypi dist/*
+
+python -m twine upload dist/*
+

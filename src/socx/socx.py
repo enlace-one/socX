@@ -48,6 +48,8 @@ ABOUT = f"""
 
 Version: {VERSION}
 A tool to assist with day to day activites in a security operations center (pronounced "socks")
+
+Visit https://enlace.one/ for more information.
 """
 USAGE = f"""Usage:
     {PROGRAM_NAME} [universal options] [function] [arguments]

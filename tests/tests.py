@@ -37,7 +37,7 @@ def test_find_file():
 ## Getting hung up
 # def test_find_file_with_regex():
 #     output = run(
-#         "-v 5 find --regex -f 'Phineas.*Ferb.txt' -d 'C:\\Users\\colli\\OneDrive\\Documents\\Python\\socX\\tests\\test_files'"
+#         "-v 5 find --regex -f 'Phineas.*Ferb.txt' -d ''"
 #     )
 #     assert output.stderr == ""
 #     assert "\\PhineasAndFerb.txt" in str(output.stdout)

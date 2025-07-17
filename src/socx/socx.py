@@ -2,6 +2,7 @@
 
 from contextlib import suppress
 from unittest import skipUnless
+from urllib.parse import unquote
 
 try:
     import argparse
@@ -84,9 +85,8 @@ def p(*args_, v=1, end="\n", sep=" ", file=None):
 
 def unwrap_url(url):
     pp_decoder = util.URLDefenseDecoder()
-    url = pp_decoder.decode(url)
     if "safelinks" in url:
-        url = url.split("url=")[1]
+        url = unquote(url.split("url=")[1])
     url = pp_decoder.decode(url)
     return url
 

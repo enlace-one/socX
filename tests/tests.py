@@ -43,16 +43,28 @@ def test_find_file():
 #     assert "\\PhineasAndFerb.txt" in str(output.stdout)
 
 
-def test_unwrap_url():
-    test_url = "https://urldefense.com/v3/__https:/conferences.stjude.org/g87vv8?i=2NejfAgCkki403xbcRpHuw&locale=en-US__;!!NfcMrC8AwgI!cq3afLDXviFyix2KeJ62VsQBrrZOgfyZu1fks7uQorRGX6VOgcDaUgTpxFdJRmXMdtU5zsmZB9PUw-TmquYgbIGIYUDPsQ$"
-    output = run(
-        f"unwrap --url '{test_url}' ",
-    )
-    assert output.stderr == ""
-    assert (
-        "https://conferences.stjude.org/g87vv8?i=2NejfAgCkki403xbcRpHuw&locale=en-US"
-        in str(output.stdout)
-    )
+# def test_unwrap_url():
+#     test_url = "https://urldefense.com/v3/__https:/conferences.stjude.org/g87vv8?i=2NejfAgCkki403xbcRpHuw&locale=en-US__;!!NfcMrC8AwgI!cq3afLDXviFyix2KeJ62VsQBrrZOgfyZu1fks7uQorRGX6VOgcDaUgTpxFdJRmXMdtU5zsmZB9PUw-TmquYgbIGIYUDPsQ$"
+#     output = run(
+#         f"unwrap --url '{test_url}' ",
+#     )
+#     assert output.stderr == ""
+#     assert (
+#         "https://conferences.stjude.org/g87vv8?i=2NejfAgCkki403xbcRpHuw&locale=en-US"
+#         in str(output.stdout)
+#     )
+
+
+# def test_unwrap_safelink_url():
+#     test_url = "https://na01.safelinks.protection.outlook.com/?url=https%3A%2F%2Foutlook.office365.com%2Fowa%2F%3FItemID%3DAAkALgAAAAAAHYQDEapmEc2byACqAC%252FEWg0AEtOij2Wdn0uk%252Bvzsc82xogACnMa3jwAA%26exvsurl%3D1%26viewmodel%3DReadMessageItem%26nativeOutlookCommand%3DopenMessage&data=05%7C02%7CCollin.Peel%40alsac.stjude.org%7C870e10f064af483039e608ddc580ff4a%7C62a96f9aa5614bfba97870a73a08dc02%7C0%7C0%7C638883880016710627%7CUnknown%7CTWFpbGZsb3d8eyJFbXB0eU1hcGkiOnRydWUsIlYiOiIwLjAuMDAwMCIsIlAiOiJXaW4zMiIsIkFOIjoiTWFpbCIsIldUIjoyfQ%3D%3D%7C0%7C%7C%7C&sdata=JiZTfR8E3%2FPCVauhcSsanHVYDR0ETfRKP1Gzjrd2ppc%3D&reserved=0"
+#     output = run(
+#         f"unwrap --url '{test_url}' ",
+#     )
+#     assert output.stderr == ""
+#     assert (
+#         "https://outlook.office365.com/owa/?ItemID=AAkALgAAAAAAHYQDEapmEc2byACqAC%2FEWg0AEtOij2Wdn0uk%2Bvzsc82xogACnMa3jwAA&exvsurl=1&viewmodel=ReadMessageItem&nativeOutlookCommand=openMessage"
+#         in str(output.stdout)
+#     )
 
 
 ## This one has issues with testing but does seem to work

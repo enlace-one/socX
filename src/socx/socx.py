@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from contextlib import suppress
+import subprocess
 from unittest import skipUnless
 from urllib.parse import unquote
 
@@ -489,6 +490,26 @@ def do_command_history(user="~"):
     p("Command history gathered", v=3)
 
 
+def awake(minutes=60):
+    interval = 10  # seconds
+    iterations = (minutes * 60) / interval
+
+    p(f"Keeping the device awake for {minutes} minutes...")
+    cmd = [
+        "powershell",
+        "-Command",
+        "$WShell = New-Object -ComObject 'WScript.Shell'; "
+        f"for ($i = 0; $i -lt {iterations}; $i++) {{ "
+        f"$WShell.SendKeys('%'); Start-Sleep -Seconds {interval}; $temp = [Math]::Round(($i*{interval})/60, 1); Write-Output \"$temp of {minutes}. CTRL+C to End\"}}",
+    ]
+
+    with subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    ) as proc:
+        for line in proc.stdout:
+            print(line, end="")
+
+
 #############
 # Arguments #
 #############.
@@ -507,6 +528,24 @@ FUNCTIONS = [
         "help": "",
         "function": lambda: interactive_mode(),
         "arguments": [],
+    },
+    {
+        "name": "Stay Awake",
+        "command": "awake",
+        "help": "",
+        "function": awake,
+        "arguments": [
+            {
+                "name": "minutes",
+                "flag": "--minutes",
+                "short_flag": "-m",
+                "prompt": "Enter number of minutes to run for: ",
+                "type": int,
+                "default": 60,
+                "required": False,
+                "help": "Keeps device awake for this many minutes",
+            },
+        ],
     },
     {
         "name": "Combine CSVs",

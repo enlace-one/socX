@@ -66,6 +66,8 @@ Examples:
     {PROGRAM_NAME} find -f fold.*name -r
     {PROGRAM_NAME} unwrap --url "https://urldefense.com/v3/__https:/..."
     {PROGRAM_NAME} combine --csvs 5
+    {PROGRAM_NAME} awake --minutes 90
+    {PROGRAM_NAME} awake --restart
 """
 verbosity = 1
 environmental_variables = {
@@ -490,7 +492,7 @@ def do_command_history(user="~"):
     p("Command history gathered", v=3)
 
 
-def awake(minutes=60):
+def awake(minutes=60, restart=False):
     interval = 10  # seconds
     iterations = (minutes * 60) / interval
 
@@ -508,6 +510,13 @@ def awake(minutes=60):
     ) as proc:
         for line in proc.stdout:
             print(line, end="")
+
+    if restart:
+        p("Restarting device...")
+        cmd = ["shutdown", "/r", "/t", "0"]
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
+        )
 
 
 #############
@@ -545,6 +554,16 @@ FUNCTIONS = [
                 "required": False,
                 "help": "Keeps device awake for this many minutes",
             },
+            {
+                "name": "restart",
+                "flag": "--restart",
+                "short_flag": "-r",
+                "type": bool,
+                "action": "store_true",
+                "default": False,
+                "required": False,
+                "help": "Restart computer once done keeping device awake",
+            },
         ],
     },
     {
@@ -576,6 +595,7 @@ FUNCTIONS = [
                 "name": "skip_og_filename_column",
                 "flag": "--skip_og_filename_column",
                 "short_flag": "-sname",
+                "action": "store_true",
                 "type": bool,
                 "default": False,
                 "required": False,
@@ -701,6 +721,7 @@ FUNCTIONS = [
                 "short_flag": "-ss",
                 "type": bool,
                 "default": False,
+                "action": "store_true",
                 "required": False,
                 "help": "Do smart search (try directory then user folder then C: then D:)",
             },

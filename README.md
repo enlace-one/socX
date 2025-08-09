@@ -1,4 +1,4 @@
-# socx
+# SOCX
 A collection of helpful tools for a SOC analyst. Easily search for IPs, domains, and find files on the system.
 
 ## Installing
@@ -20,21 +20,26 @@ or
     python socx.py [universal options] [function] [arguments]
 
 Examples:
+
     socx --help
 
     socx info -h
-
+    
     socx info -ip 1.2.3.4
-
+    
     socx -v 3 info -d google.com
-
+    
     socx find -f filename.txt -i
-
+    
     socx find -f fold.*name -r
-
+    
     socx unwrap --url "https://urldefense.com/v3/__https:/..."
-
+    
     socx combine --csvs 5
+    
+    socx awake --minutes 90
+    
+    socx awake --restart
 
 ## Other Information
 

@@ -7,5 +7,6 @@ src/socx.egg-info/PKG-INFO
 src/socx.egg-info/SOURCES.txt
 src/socx.egg-info/dependency_links.txt
 src/socx.egg-info/entry_points.txt
+src/socx.egg-info/requires.txt
 src/socx.egg-info/top_level.txt
 tests/tests.py

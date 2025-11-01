@@ -1,12 +1,28 @@
 Metadata-Version: 2.4
 Name: socx
-Version: 2.3
+Version: 2.4.0
 Summary: A set of useful tools for a security operations center
 Author-email: Enlace <enlace.aman@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/yourusername/socx
+Project-URL: Repository, https://github.com/yourusername/socx
+Project-URL: Issues, https://github.com/yourusername/socx/issues
+Keywords: soc,security,operations,automation
 Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
+Classifier: Intended Audience :: Information Technology
+Classifier: Topic :: Security
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
+Requires-Dist: keyring>=25.6.0
+Requires-Dist: pandas>=2.3.3
+Requires-Dist: requests>=2.32.5
 
 # SOCX
 A collection of helpful tools for a SOC analyst. Easily search for IPs, domains, and find files on the system.

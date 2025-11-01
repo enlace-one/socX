@@ -40,7 +40,7 @@ or
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
-VERSION = "2.1.1"
+VERSION = "2.4.0"
 ABOUT = f"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -89,7 +89,9 @@ def p(*args_, v=1, end="\n", sep=" ", file=None):
 def unwrap_url(url):
     pp_decoder = util.URLDefenseDecoder()
     if "safelinks" in url:
-        url = unquote(url.split("url=")[1])
+        url = [t for t in re.split(r"&|\?", url) if t.startswith("url=")][0]
+        url = url.split("=")[1]
+        url = unquote(url)
     url = pp_decoder.decode(url)
     return url
 
@@ -446,18 +448,23 @@ def do_browser_history(user="~"):
                         p(f"Error with {name} - {e}", v=3)
 
 
-def do_combine_csvs(csvs=0, skip_og_filename_column=False, directory=os.getcwd()):
+def do_combine_csvs(
+    csvs=0, skip_og_filename_column=False, directory=os.getcwd(), remove_dupes=False
+):
     p("Starting combine CSVs", v=5)
     p("The current directory will be used to find the CSVs.", v=1)
     paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
     paths.reverse()
+    paths = [p for p in paths if str(p).endswith(".csv")]
+    if len(paths) == 0:
+        p("There are no csvs in this directory", v=1)
+        return
     if csvs < 2:
         accum = 1
         p("File Paths", v=3)
         for path in paths:
-            if str(path).endswith(".csv"):
-                p(f"{accum} - {path}")
-                accum += 1
+            p(f"{accum} - {path}")
+            accum += 1
         csvs = int(input("Enter the index of the last CSV to include:"))
     file_paths = []
     for path in paths:
@@ -474,6 +481,11 @@ def do_combine_csvs(csvs=0, skip_og_filename_column=False, directory=os.getcwd()
             df["Original CSV Filename"] = os.path.basename(path)
         dfs.append(df)
     df = pd.concat(dfs)
+    if remove_dupes:
+        # Remove dupes by all but df['Original CSV Filename']
+        df = df.drop_duplicates(
+            subset=[col for col in df.columns if col != "Original CSV Filename"]
+        )
     df.to_csv("COMBINED_FILE.csv", index=False)
     p("Outputed to COMBINED_FILE.csv", v=3)
 
@@ -529,13 +541,6 @@ FUNCTIONS = [
         "command": "config",
         "help": "",
         "function": lambda: do_config(),
-        "arguments": [],
-    },
-    {
-        "name": "Interactive mode",
-        "command": "interactive",
-        "help": "",
-        "function": lambda: interactive_mode(),
         "arguments": [],
     },
     {
@@ -600,6 +605,16 @@ FUNCTIONS = [
                 "default": False,
                 "required": False,
                 "help": "Include a column with the OG file name",
+            },
+            {
+                "name": "remove_dupes",
+                "flag": "--deduplicate",
+                "short_flag": "-dedupe",
+                "action": "store_true",
+                "type": bool,
+                "default": False,
+                "required": False,
+                "help": "Remove duplicate rows (excludes OG file name column)",
             },
         ],
     },
@@ -762,6 +777,14 @@ FUNCTIONS = [
                 "help": "The user's name to use. Default is current user.",
             }
         ],
+    },
+    # INTERACTIVE MODE MUST BE LAST OR INDEX IS OFF!
+    {
+        "name": "Interactive mode",
+        "command": "interactive",
+        "help": "",
+        "function": lambda: interactive_mode(),
+        "arguments": [],
     },
 ]
 

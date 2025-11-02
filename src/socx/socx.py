@@ -4,6 +4,7 @@ from contextlib import suppress
 import subprocess
 from unittest import skipUnless
 from urllib.parse import unquote
+import zipfile
 
 try:
     import argparse
@@ -40,7 +41,7 @@ or
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
-VERSION = "2.4.0"
+VERSION = "2.4.1"
 ABOUT = f"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -490,6 +491,47 @@ def do_combine_csvs(
     p("Outputed to COMBINED_FILE.csv", v=3)
 
 
+
+def do_unzip(
+    zip_folder_count=0, directory=os.getcwd()
+):
+    p("Starting unzip", v=5)
+    p("The current directory will be used to find the .zip folders.", v=1)
+    paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
+    paths.reverse()
+    paths = [p for p in paths if str(p).endswith(".zip")]
+    if len(paths) == 0:
+        p("There are no zips in this directory", v=1)
+        return
+    if zip_folder_count < 2:
+        accum = 1
+        p("File Paths", v=3)
+        for path in paths:
+            p(f"{accum} - {path}")
+            accum += 1
+        zip_folder_count = int(input("Enter the index of the last .zip to include:"))
+    file_paths = []
+    for path in paths:
+        file_paths.append(str(path))
+        p(f"Added {path}", v=4)
+        zip_folder_count -= 1
+        if zip_folder_count == 0:
+            break
+    extracted_count = 0
+    for path in file_paths:
+        try:
+            with zipfile.ZipFile(path, 'r') as zip_ref:
+                zip_ref.extractall(directory)
+            p(f"Extracted {path} to {directory}", v=2)
+            extracted_count += len(zip_ref.namelist())
+        except zipfile.BadZipFile:
+            p(f"Error: {path} is not a valid zip file.", v=1)
+        except Exception as e:
+            p(f"Error extracting {path}: {str(e)}", v=1)
+
+    p(f"Outputed to the contents of all zips into {directory}", v=1)
+
+
 def do_command_history(user="~"):
     p("Gathering command history. Will output to cwd.", v=3)
     cwd = os.getcwd()
@@ -501,7 +543,7 @@ def do_command_history(user="~"):
         with open(cwd + "\\powershell_history.txt", "w") as output_file:
             for line in file:
                 output_file.write(line)
-    p("Command history gathered", v=3)
+    p("Command history gathered", v=1)
 
 
 def awake(minutes=60, restart=False):
@@ -616,6 +658,33 @@ FUNCTIONS = [
                 "required": False,
                 "help": "Remove duplicate rows (excludes OG file name column)",
             },
+        ],
+    },
+    {
+        "name": "Unzip .zip Folders",
+        "command": "unzip",
+        "help": "",
+        "function": do_unzip,
+        "arguments": [
+            {
+                "name": "zip_folder_count",
+                "flag": "--count",
+                "short_flag": "-c",
+                "prompt": "Enter number of zips to combine (1 for walkthrough): ",
+                "type": int,
+                "default": 0,
+                "required": False,
+                "help": "Combine the last X .zips in the current directory. Enter 1 for walkthrough",
+            },
+            {
+                "name": "directory",
+                "flag": "--directory",
+                "short_flag": "-d",
+                "type": str,
+                "default": os.getcwd(),
+                "required": False,
+                "help": "The directory to use, defaults to cwd",
+            }
         ],
     },
     {

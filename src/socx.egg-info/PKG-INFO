@@ -1,12 +1,10 @@
 Metadata-Version: 2.4
 Name: socx
-Version: 2.4.0
+Version: 2.4.1
 Summary: A set of useful tools for a security operations center
 Author-email: Enlace <enlace.aman@gmail.com>
-License: MIT
-Project-URL: Homepage, https://github.com/yourusername/socx
-Project-URL: Repository, https://github.com/yourusername/socx
-Project-URL: Issues, https://github.com/yourusername/socx/issues
+Project-URL: Homepage, https://enlace.one
+Project-URL: Repository, https://github.com/enlace-one/socx
 Keywords: soc,security,operations,automation
 Classifier: Programming Language :: Python :: 3
 Classifier: Programming Language :: Python :: 3.8
@@ -14,7 +12,6 @@ Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
-Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Classifier: Intended Audience :: Information Technology
 Classifier: Topic :: Security

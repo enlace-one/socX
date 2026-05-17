@@ -863,13 +863,13 @@ FUNCTIONS = [
 
 
 def interactive_mode():
+    functions_copy = [f for f in FUNCTIONS if func["command"] != "interactive"]
     # Get Function
-    for index, func in enumerate(FUNCTIONS):
-        if func["command"] != "interactive":
-            print(f"{index}: {func['name']}")
+    for index, func in enumerate(functions_copy):
+        print(f"{index}: {func['name']}")
     try:
         index = int(input("Enter the number of the function to perform: "))
-        selected = FUNCTIONS[index]
+        selected = functions_copy[index]
     except (ValueError, IndexError):
         print("Invalid choice.")
         return

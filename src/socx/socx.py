@@ -42,7 +42,7 @@ or
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
 VERSION = "2.4.1"
-ABOUT = f"""
+ABOUT = rf"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
   \__ \/ / / / /    |   / 
@@ -491,10 +491,7 @@ def do_combine_csvs(
     p("Outputed to COMBINED_FILE.csv", v=3)
 
 
-
-def do_unzip(
-    zip_folder_count=0, directory=os.getcwd()
-):
+def do_unzip(zip_folder_count=0, directory=os.getcwd()):
     p("Starting unzip", v=5)
     p("The current directory will be used to find the .zip folders.", v=1)
     paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
@@ -520,7 +517,7 @@ def do_unzip(
     extracted_count = 0
     for path in file_paths:
         try:
-            with zipfile.ZipFile(path, 'r') as zip_ref:
+            with zipfile.ZipFile(path, "r") as zip_ref:
                 zip_ref.extractall(directory)
             p(f"Extracted {path} to {directory}", v=2)
             extracted_count += len(zip_ref.namelist())
@@ -684,7 +681,7 @@ FUNCTIONS = [
                 "default": os.getcwd(),
                 "required": False,
                 "help": "The directory to use, defaults to cwd",
-            }
+            },
         ],
     },
     {
@@ -863,7 +860,7 @@ FUNCTIONS = [
 
 
 def interactive_mode():
-    functions_copy = [f for f in FUNCTIONS if func["command"] != "interactive"]
+    functions_copy = [f for f in FUNCTIONS if f["command"] != "interactive"]
     # Get Function
     for index, func in enumerate(functions_copy):
         print(f"{index}: {func['name']}")
@@ -1044,7 +1041,7 @@ def main():
             require_one_of = selected["rules"]["require_one_of"]
             count = 0
             for a in require_one_of:
-                if hasattr(args, a):
+                if getattr(args, a, None) is not None:
                     count += 1
             if not count:
                 print(

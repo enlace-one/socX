@@ -1,43 +1,26 @@
 #!/usr/bin/env python3
 
-from contextlib import suppress
-import subprocess
-from unittest import skipUnless
-from urllib.parse import unquote
+import ipaddress
+import os
+import re
 import zipfile
+import socket
+import subprocess
+from urllib.parse import unquote, urlparse
+import datetime as dt
+import sqlite3 as sql
 
 try:
-    import argparse
-    import os
-    import time
-    import re
-    import socket
-    import hashlib
-    import requests
-    import sqlite3 as sql
-    import pandas as pd
-    import keyring
-    import xml.etree.ElementTree as ET
-    from pathlib import Path
+    from . import util
+except:
+    import util
 
-    try:
-        from . import util
-    except:
-        import util
-except ImportError as e:
-    print(
-        f"""You are missing a required module ({e.name})
-Try installing it with:
-    pip install {e.name}
-or
-    python -m pip install {e.name} --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org"""
-    )
-    exit(1)
-
-
-###########################
-# Constants and Variables #
-###########################.
+import requests
+import pandas as pd
+import typer
+import keyring
+import xml.etree.ElementTree as ET
+from pathlib import Path
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
@@ -54,322 +37,593 @@ A tool to assist with day to day activites in a security operations center (pron
 
 Visit https://enlace.one/ for more information.
 """
-USAGE = f"""Usage:
+USAGE = rf"""Usage:
     {PROGRAM_NAME} [universal options] [function] [arguments]
     python {PROGRAM_NAME}.py [universal options] [function] [arguments]
         
 Examples:
     {PROGRAM_NAME} --help
-    {PROGRAM_NAME} info -h
-    {PROGRAM_NAME} info -ip 1.2.3.4
-    {PROGRAM_NAME} -v 3 info -d google.com
-    {PROGRAM_NAME} find -f filename.txt -i
-    {PROGRAM_NAME} find -f fold.*name -r
-    {PROGRAM_NAME} unwrap --url "https://urldefense.com/v3/__https:/..."
+    {PROGRAM_NAME} info --help
+    {PROGRAM_NAME} info 1.2.3.4
+    {PROGRAM_NAME} -v 3 info google.com
+    {PROGRAM_NAME} find filename.txt -i False
+    {PROGRAM_NAME} find fold.*name -r
+    {PROGRAM_NAME} unwrap "https://urldefense.com/v3/__https:/..."
     {PROGRAM_NAME} combine --csvs 5
     {PROGRAM_NAME} awake --minutes 90
     {PROGRAM_NAME} awake --restart
 """
-verbosity = 1
-environmental_variables = {
-    "InsightVMAPI_BASE_URL": "",
-    "InsightVMAPI_KEY": "",
-    "VirusTotalAPI_KEY": "",
-}
+
+app = typer.Typer(help="SOCX - Security Operations Center utility toolkit")
 
 # ----------------#
-# Util Functions #
+# Globals
+# ----------------#
+
+ENV_DEFAULTS = {"DefaultVerbosity": "2", "VirusTotalAPIKey": ""}
+
+
+class AppState:
+    def __init__(self):
+        self.verbosity = 1
+
+
+state = AppState()
+
+
+def p(*args, v=1):
+    if state.verbosity >= v:
+        typer.echo(" ".join(str(a) for a in args))
+
+
+def get_env(name: str):
+    val = keyring.get_password("system", "_socX__" + name)
+    return val if val is not None else ENV_DEFAULTS.get(name, "")
+
+
+default_verbosity = int(get_env("DefaultVerbosity"))
+
+# ----------------#
+# Banner
 # ----------------#
 
 
-def p(*args_, v=1, end="\n", sep=" ", file=None):
-    if verbosity >= v:
-        print(*args_, end=end, sep=sep, file=file)
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    verbosity: int = typer.Option(default_verbosity, "--verbosity", "-v"),
+):
+    state.verbosity = verbosity
+
+    if ctx.invoked_subcommand is None:
+        print(ABOUT)
+        print(USAGE)
+        raise typer.Exit()
 
 
-def unwrap_url(url):
-    pp_decoder = util.URLDefenseDecoder()
+# ----------------#
+# URL utilities
+# ----------------#
+
+
+def unwrap_url(url: str) -> str:
+    decoder = util.URLDefenseDecoder()
+
     if "safelinks" in url:
-        url = [t for t in re.split(r"&|\?", url) if t.startswith("url=")][0]
-        url = url.split("=")[1]
-        url = unquote(url)
-    url = pp_decoder.decode(url)
-    return url
+        p("Safelink detected, removing...", v=4)
+        parts = [t for t in re.split(r"&|\?", url) if t.startswith("url=")]
+        if parts:
+            url = parts[0].split("=", 1)[1]
+            url = unquote(url)
+        p(f"URL after removing Safelinks: \n{url}\n", v=5)
+
+    url = decoder.decode(url)
+
+    p(f"URL after removing Proofpoint URL wrapping: \n{url}\n", v=5)
+
+    return decoder.decode(url)
 
 
-def search(pattern, string, case_insensitive):
-    if case_insensitive:
-        return re.search(pattern, string, re.IGNORECASE)
-    else:
-        return re.search(pattern, string)
+# ----------------#
+# Info tools
+# ----------------#
 
 
-def find_file(
-    filename,
-    directory=os.getcwd(),
-    is_regex=False,
-    case_insensitive=True,
-    find_all=False,
-):
-    files_found = []
-    filename_copy = filename
-    p(f"Starting file search in {directory}", v=5)
-    if case_insensitive and not is_regex:
-        filename = filename.lower()
-    for root, dirs, files in os.walk(directory):
-        if is_regex:
-            r_files = [
-                os.path.join(root, file)
-                for file in files + dirs
-                if search(filename, file, case_insensitive)
-            ]
-            if find_all:
-                files_found.extend(r_files)
-            elif len(r_files) > 0:
-                return r_files[0]
-        else:
-            if case_insensitive:
-                files = [file.lower() for file in files]
-                dirs = [dir.lower() for dir in dirs]
-            if filename in files or filename in dirs:
-                if find_all:
-                    files_found.append(os.path.join(root, filename_copy))
-                else:
-                    return os.path.join(root, filename_copy)
-    if find_all:
-        return files_found
-    else:
-        return None
+def print_ip_info(ip: str):
+    p("Retrieving WHOIS information", v=5)
 
-
-def print_ip_info(ip):
-    url = f"https://whois.arin.net/rest/ip/{ip}"
-    ip_xml = requests.request("GET", url=url).text
-    namespaces = {"ns": "https://www.arin.net/whoisrws/core/v1"}
-    organization_url = ET.fromstring(ip_xml).find("ns:orgRef", namespaces).text
-    org_xml = requests.request("GET", url=organization_url).text
-    root = ET.fromstring(org_xml)
-    org_name = root.find("ns:name", namespaces).text
-    org_city = root.find("ns:city", namespaces).text
-    org_country = root.find("ns:iso3166-1/ns:name", namespaces).text
-    org_handle = root.find("ns:handle", namespaces).text
-    registration_date = root.find("ns:registrationDate", namespaces).text
-    print(f"(whois) Organization: {org_name}")
-    print(f"(whois) Country: {org_country}")
-    print(f"(whois) City: {org_city}")
-    print(f"(whois) Handle: {org_handle}")
-    print(f"(whois) Registration Date: {registration_date}")
-
-
-def get_enironmental_variable(name):
-    value = keyring.get_password("system", "_socX__" + name)
-    if value is None:
-        value = environmental_variables[name]
-    return value
-
-
-#####################
-# Primary Functions #
-#####################.
-
-
-def do_config():
-    while True:
-        p("Settings, keys, variables", v=1)
-        for index, var in enumerate(environmental_variables.keys()):
-            print(f"\t{index} - {var}")
-        index = input(
-            "Enter the index of the variable you want to edit (Nothing to stop): "
-        )
-        if index == "":
-            break
-        else:
-            index = int(index)
-        p(f"Editing '{list(environmental_variables.keys())[index]}'", v=1)
-        old_value = get_enironmental_variable(
-            list(environmental_variables.keys())[index]
-        )
-        print(f"Old value:'{old_value}'")
-        new_value = input("New value (Nothing to cancel): ")
-        if new_value == "":
-            continue
-        print("_socX__" + list(environmental_variables.keys())[index])
-        keyring.set_password(
-            "system",
-            "_socX__" + list(environmental_variables.keys())[index],
-            new_value,
-        )
-        p("Value updated\n", v=1)
-
-
-def do_ip_info(ip):
-    p(f"Getting information on {ip}", v=1)
     try:
-        hostname = socket.gethostbyaddr(ip)
-        print(f"Hostname: {hostname}")
+        url = f"https://whois.arin.net/rest/ip/{ip}"
+        ip_xml = requests.get(url, timeout=10).text
+
+        ns = {"ns": "https://www.arin.net/whoisrws/core/v1"}
+        root = ET.fromstring(ip_xml)
+
+        org_url = root.find("ns:orgRef", ns).text
+        org_xml = requests.get(org_url, timeout=10).text
+        org = ET.fromstring(org_xml)
+
+        p(f"Organization: {org.find('ns:name', ns).text}")
+        p(f"City: {org.find('ns:city', ns).text}")
+        p(f"Country: {org.find('ns:iso3166-1/ns:name', ns).text}")
+        p(f"Handle: {org.find('ns:handle', ns).text}")
+        p(f"Registered: {org.find('ns:registrationDate', ns).text}")
+
     except Exception as e:
-        p(f"Hostname: Error - {e}", v=1)
-    ping_response = os.system(f"ping -n 1 {ip} > nul")
-    if ping_response == 0:
-        print(f"Ping: {ip} is up")
+        p(f"WHOIS error: {e}")
+
+
+def ping(ip):
+    p("Running ping test", v=5)
+    result = subprocess.run(["ping", "-n", "1", ip], capture_output=True, text=True)
+    if result.returncode != 0:
+        p(f"Pingable: False ({ip} is down)")
+    elif "Reply" in result.stdout:
+        matches = re.search(r"Minimum = (\d+ms)", result.stdout)
+        if matches:
+            speed = matches.group(1)
+            p(f"Pingable: True ({ip} is up). Round trip speed: {speed}")
+        else:
+            p("Cannot determine ping speed", v=5)
+            p(f"Pingable: True ({ip} is up)")
     else:
-        print(f"Ping: {ip} is down")
-    print_ip_info(ip)
-    if (
-        get_enironmental_variable("InsightVMAPI_BASE_URL") != ""
-        and get_enironmental_variable("InsightVMAPI_KEY") != ""
-    ):
-        ivm = util.InsightVM(
-            get_enironmental_variable("InsightVMAPI_BASE_URL"),
-            get_enironmental_variable("InsightVMAPI_KEY"),
-        )
-        for asset in ivm.ip_search(ip):
-            print(ivm._format_return_string(asset))
+        p("Cannot automatically detect ping success. See stdout below.", v=4)
+        p(f"{result.stdout}")
 
 
-def do_domain_info(domain):
-    if domain.startswith("http"):
-        domain = domain.split("//")[1]
-    if domain.startswith("www."):
-        domain = domain.split("www.")[1]
-    p(f"Getting information on {domain}", v=1)
+def determine_info_argument_type(argument: str) -> str:
+    """
+    Determines if the input is an IP, domain, or URL.
+    Returns: "ip", "domain", or "url"
+    """
+
+    argument = argument.strip()
+
+    # 1. URL check (must come first)
+    parsed = urlparse(argument)
+    if parsed.scheme and parsed.netloc:
+        return "url"
+
+    # Sometimes URLs come without scheme
+    if argument.startswith(("http://", "https://", "ftp://")):
+        return "url"
+
+    # 2. IP check
     try:
-        ip = socket.gethostbyname(domain)
-        print(f"IP: {ip}")
-    except Exception as e:
-        p(f"IP: Error - {e}", v=1)
-    ping_response = os.system(f"ping -n 1 {domain} > nul")
-    if ping_response == 0:
-        print(f"Ping: {domain} is up")
-    else:
-        print(f"Ping: {domain} is down")
-    print_ip_info(ip)
-    print(f"Whois record: https://www.whois.com/whois/{domain}")
+        ipaddress.ip_address(argument)
+        return "ip"
+    except ValueError:
+        pass
+
+    # 3. Domain check (basic validation)
+    domain_regex = re.compile(r"^(?=.{1,253}$)" r"([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$")
+
+    if domain_regex.match(argument):
+        return "domain"
+
+    return "unknown"
 
 
-def do_url_info(url):
-    url = unwrap_url(url)
-    vt_api_key = get_enironmental_variable("VirusTotalAPI_KEY")
-    vt_report_url = ""
-    if vt_api_key != "":
-        response = requests.request(
-            "POST",
-            url="https://www.virustotal.com/api/v3/urls",
-            headers={"x-apikey": vt_api_key},
-            data={"url": url},
-        )
-        vt_report_url = response.json()["data"]["links"]["self"]
-    p(f"Getting information on {url} (unwrapped)", v=1)
-    if vt_api_key != "":
-        p("Waiting for Virustotal to process..", v=3)
-        for seconds in [5, 7, 10, 15]:
-            time.sleep(seconds)
-            report_response = requests.request(
-                "GET", url=vt_report_url, headers={"x-apikey": vt_api_key}
-            ).json()
-            if report_response["data"]["attributes"]["status"] != "queued":
-                print("Virustotal:", report_response["data"]["links"]["item"])
-                print(
-                    "Virustotal:",
-                    report_response["data"]["attributes"]["stats"],
+@app.command()
+def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
+    """Get info on IP, domain, or URL"""
+
+    p("Starting info lookup", v=3)
+
+    argument_type = determine_info_argument_type(argument)
+    ip = domain = url = argument  # Used later
+
+    if argument_type == "unknown":
+        p("Error: Could not determine argument type.")
+        return
+    p(f"Determined argument is of type {argument_type}.", v=5)
+
+    if argument_type == "ip":
+
+        p(f"IP lookup requested for {ip}", v=3)
+
+        try:
+            p("Resolving hostname", v=5)
+
+            host = socket.gethostbyaddr(ip)
+
+            p(f"Hostname: {host[0]}")
+
+        except Exception as e:
+            p(f"Hostname lookup failed", v=2)
+            p(f"{e}", v=4)
+
+        ping(ip)
+
+        print_ip_info(ip)
+
+    elif argument_type == "domain":
+
+        p(f"Domain lookup requested for {domain}", v=3)
+
+        if domain.startswith("http"):
+            p("Stripping URL scheme", v=4)
+            domain = domain.split("//")[1]
+
+        domain = domain.replace("www.", "")
+
+        p(f"Normalized domain: {domain}", v=3)
+
+        try:
+
+            p("Resolving domain", v=5)
+
+            ip_resolved = socket.gethostbyname(domain)
+
+            p(f"IP: {ip_resolved}")
+
+        except Exception as e:
+
+            p(f"Domain resolution failed: {e}", v=1)
+
+            ip_resolved = None
+
+        ping(domain)
+
+        if ip_resolved:
+
+            print_ip_info(ip_resolved)
+
+        p(f"WHOIS: https://www.whois.com/whois/{domain}")
+
+    elif argument_type == "url":
+
+        p("URL lookup requested", v=3)
+
+        p("Unwrapping URL", v=4)
+
+        url = unwrap_url(url)
+
+        p(f"Unwrapped: {url}", v=2)
+
+        api = get_env("VirusTotalAPIKey")
+
+        if api:
+
+            p("VirusTotal API key detected", v=3)
+
+            p("Submitting URL to VirusTotal...", v=2)
+
+            try:
+
+                resp = requests.post(
+                    "https://www.virustotal.com/api/v3/urls",
+                    headers={"x-apikey": api},
+                    data={"url": url},
+                    timeout=10,
                 )
-                p("P.S. Run again if stats are incomplete now.", v=3)
-                break
 
+                p(f"VirusTotal submission status: {resp.status_code}")
 
-def do_info(**kwargs):
-    if "ip" in kwargs:
-        return do_ip_info(kwargs["ip"])
-    elif "domain" in kwargs:
-        return do_domain_info(kwargs["domain"])
-    elif "url" in kwargs:
-        return do_url_info(kwargs["url"])
-    else:
-        print("Error: you must provide a valid argument")
+                p(resp.text, v=5)
 
+            except Exception as e:
 
-def do_filename_search(
-    filename,
-    directory=os.getcwd(),
-    find_all=False,
-    is_regex=False,
-    case_sensitive=False,
-    skip_smart=False,
-):
+                p(f"VirusTotal submission failed: {e}", v=1)
+                p(e, v=5)
 
-    case_insensitive = not case_sensitive
-
-    p(f"Searching for {filename}", v=1)
-    if case_insensitive:
-        p("Performing case insensitive search", v=3)
-    if find_all:
-        p("Finding all occurances", v=3)
-    if find_all:
-        result = find_file(
-            filename,
-            directory="C:\\",
-            is_regex=is_regex,
-            find_all=find_all,
-            case_insensitive=case_insensitive,
-        )
-        result += find_file(
-            filename,
-            directory="D:\\",
-            is_regex=is_regex,
-            find_all=find_all,
-            case_insensitive=case_insensitive,
-        )
-        result = set(result)
-        if len(result) == 0:
-            print("File/Folder not found")
         else:
-            for file in result:
-                print(f"File/Folder found at {file}")
-    elif not skip_smart:
-        for path in dict.fromkeys(
-            [
-                directory,
-                os.path.dirname(os.path.dirname(directory)),
-                os.path.expanduser("~"),
-                "C:\\",
-                "D:\\",
-            ]
-        ):
-            p(f"Checking {path}..", v=3)
-            result = find_file(
-                filename,
-                directory=path,
-                is_regex=is_regex,
-                case_insensitive=case_insensitive,
+            p("VirusTotal API key not configured", v=3)
+
+
+# ----------------#
+# File search
+# ----------------#
+class FileFinder:
+    def __init__(
+        self, filename, directory, regex, find_all, case_sensitive, smart_search
+    ):
+        self.filename = filename
+        self.directory = directory
+        self.regex = regex
+        self.find_all = find_all
+        self.case_sensitive = case_sensitive
+        self.smart_search = smart_search
+        self.results = []
+        self.directories_searched = []
+        self.done = False
+
+    def matches(self, item_to_match):
+        if self.regex and self.case_sensitive:
+            return bool(re.search(self.filename, item_to_match))
+        elif self.regex:
+            return bool(re.search(self.filename, item_to_match, re.IGNORECASE))
+        elif self.case_sensitive:
+            return self.filename in item_to_match
+        else:
+            return self.filename.lower() in item_to_match.lower()
+
+    def search(self):
+        current_directory = self.directory
+
+        # Search current directory tree
+        self.search_directory(current_directory)
+
+        if not self.done and self.smart_search:
+            p(
+                f"Not found in '{self.directory}' \nStarting broader smart search...",
+                v=3,
             )
-            if result is None:
-                p(f"File not found in {path}..", v=2)
-            else:
+
+        # Walk upward through parent directories
+        while not self.done and self.smart_search:
+            parent = os.path.dirname(os.path.abspath(current_directory))
+
+            # Avoid infinite loop at filesystem root
+            if parent == os.path.abspath(current_directory):
                 break
-        if result is None:
-            print("File/Folder not found")
+
+            self.search_directory(parent)
+            current_directory = parent
+
+        # Search other drives
+        while not self.done:
+            current_drive = os.path.splitdrive(os.path.abspath(self.directory))[
+                0
+            ].upper()
+
+            p(f"Done searching current drive ({current_drive})", v=2)
+
+            for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                drive = f"{letter}:"
+
+                # Skip current drive
+                if drive == current_drive:
+                    continue
+
+                # Skip nonexistent drives
+                if not os.path.exists(f"{drive}\\"):
+                    continue
+
+                p(f"Searching drive {drive}...", v=2)
+
+                self.search_directory(f"{drive}\\")
+
+                if self.done:
+                    break
+
+            break
+
+    def search_directory(self, directory):
+        for root, dirs, files in os.walk(directory):
+            if os.path.abspath(root) in self.directories_searched:
+                dirs.clear()  # Prunes os.walk from descending into subdirectories
+                continue
+            p(f"Checking '{os.path.abspath(root)}'", v=5)
+            for f in files:
+                if self.matches(f):
+                    m = os.path.join(root, f)
+                    p(f"Match found: {m}", v=2)
+                    self.results.append(m)
+                    if not self.find_all:
+                        self.done = True
+                        break
+        self.directories_searched.append(os.path.abspath(directory))
+
+    def report(self):
+        if self.results:
+            p(f"Result{'s' if len(self.results) > 1 else ''}:")
+            for r in self.results:
+                p(f"- {r}")
         else:
-            print(f"File/Folder found at {result}")
-    else:
-        result = find_file(
-            filename,
-            directory=directory,
-            is_regex=is_regex,
-            case_insensitive=case_insensitive,
+            p(
+                f"Not found {'anywhere' if self.smart_search else 'in ' + self.directory}"
+            )
+
+
+@app.command()
+def find(
+    filename,
+    directory: str = typer.Option(".", "-d", "--directory"),
+    regex: bool = typer.Option(False, "-r", "--regex"),
+    find_all: bool = typer.Option(False, "-a", "--all"),
+    case_sensitive: bool = typer.Option(False, "-c", "--case-sensitive"),
+    skip_smart_search: bool = typer.Option(False, "-s", "--skip_smart"),
+):
+    """Search for a file or folder"""
+
+    if find_all and not skip_smart_search:
+        p("Smart search not available as find_all is True", v=2)
+        skip_smart_search = True
+
+    drive_root = os.path.splitdrive(os.path.abspath(directory))[0] + os.sep
+    if find_all and os.path.abspath(directory) != drive_root:
+        p(f"Starting search from drive root ({drive_root}) as find_all is True", v=2)
+        directory = drive_root
+
+    if not skip_smart_search:
+        p(
+            "Using smart search (starts in current working directory and works backwards)",
+            v=4,
         )
-        if result is None:
-            print("File/Folder not found")
-        else:
-            print(f"File/Folder found at {result}")
+
+    p(f"Case sensitive search: {case_sensitive}", v=5)
+    p(f"Regex search: {regex}", v=5)
+
+    finder = FileFinder(
+        filename,
+        directory,
+        regex,
+        find_all,
+        case_sensitive,
+        smart_search=not skip_smart_search,
+    )
+    finder.search()
+    finder.report()
 
 
-def do_url_unwrap(url):
-    p("Unwrapping URL\n", v=3)
-    print(f"Unwrapped URL:\n{unwrap_url(url)}")
-    p("\n", v=3)
+# ----------------#
+# URL unwrap
+# ----------------#
 
 
-def do_browser_history(user="~"):
+@app.command()
+def unwrap(url: str):
+    """Unwrap a safelinks URL"""
+    url = unwrap_url(url)
+    p("Unwrapped URL:", v=2)
+    p(url)
+
+
+# ----------------#
+# CSV combine
+# ----------------#
+
+
+@app.command()
+def combine(
+    directory: str = typer.Option(".", "-d", "--directory"),
+    count: str = typer.Option(2, "-c", "--count"),
+):
+    """Combine multiple CSVs of the same format"""
+
+    p("Starting combine CSV", v=2)
+
+    count = int(count)
+
+    directory = os.path.abspath(directory)
+
+    p(f"Using directory: {directory}", v=3)
+    p(f"Looking for {count} CSV file(s)", v=3)
+
+    files = sorted(Path(directory).glob("*.csv"), key=os.path.getmtime, reverse=True)
+
+    p(f"Found {len(files)} CSV file(s)", v=3)
+
+    if len(files) < count:
+        p("Not enough CSVs")
+        raise typer.Exit()
+
+    dfs = []
+
+    for f in files[:count]:
+        p(f"Loading {f.name}", v=4)
+
+        df = pd.read_csv(f)
+
+        p(f"Loaded {len(df)} row(s)", v=5)
+
+        df["source"] = f.name
+        dfs.append(df)
+
+    p("Concatenating dataframes", v=3)
+
+    cleaned = [
+        df
+        for df in dfs
+        if df is not None and not df.empty and not df.isna().all().all()
+    ]
+
+    if cleaned:
+        out = pd.concat(dfs)
+    else:
+        pd.DataFrame()
+
+    out = pd.concat(dfs)
+
+    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    output_filename = f"SOCX_COMBINED_FILE_{timestamp}.csv"
+
+    p(f"Writing output to {output_filename}", v=4)
+
+    output_filename = os.path.join(directory, output_filename)
+
+    out.to_csv(output_filename, index=False)
+
+    p(f"Saved {output_filename}", v=1)
+
+
+# ----------------#
+# ZIP extract
+# ----------------#
+
+
+@app.command()
+def unzip(directory: str = ".", count: int = 1):
+    """Unzip multiple zip files at once"""
+
+    p("Starting ZIP extraction", v=2)
+
+    if directory == ".":
+        p("Using current working directory", v=3)
+
+    directory = os.path.abspath(directory)
+
+    p(f"Using directory: {directory}", v=2)
+    p(f"Looking for {count} ZIP file(s)", v=2)
+
+    zips = sorted(
+        Path(directory).glob("*.zip"),
+        key=os.path.getmtime,
+        reverse=True,
+    )
+
+    p(f"Found {len(zips)} ZIP file(s)", v=3)
+
+    if len(zips) < count:
+        p("Not enough ZIP files found", v=1)
+        raise typer.Exit()
+
+    for z in zips[:count]:
+
+        p(f"Extracting {z.name}", v=2)
+
+        try:
+            with zipfile.ZipFile(z, "r") as zip_ref:
+
+                p(f"Extracting into {directory}", v=4)
+
+                zip_ref.extractall(directory)
+
+                p(
+                    f"Extracted {len(zip_ref.namelist())} file(s)",
+                    v=3,
+                )
+
+            p(f"Successfully extracted {z.name}", v=1)
+
+        except Exception as e:
+            p(f"Error extracting {z.name}: {e}", v=1)
+            p(e, v=5)
+
+
+# ----------------#
+# Keep awake
+# ----------------#
+
+
+@app.command()
+def awake(minutes: int = 60):
+    """Keep your screen awake"""
+    interval = 10
+    iterations = int((minutes * 60) / interval)
+
+    p(f"Keeping awake for {minutes} minutes")
+
+    cmd = [
+        "powershell",
+        "-Command",
+        f"$w=new-object -com wscript.shell;for($i=0;$i -lt {iterations};$i++){{"
+        f"$w.SendKeys('%');start-sleep {interval}}}",
+    ]
+
+    subprocess.run(cmd)
+
+
+# ----------------#
+# Browser history
+# ----------------#
+
+
+@app.command()
+def browser_history(user: str = "~"):
+    """Get browser history artifacts"""
     p("Gathering browser history. Will output to cwd", v=3)
     p(
         "You may want to close the browser before running this, otherwise you may get 'database is locked' errors",
@@ -447,647 +701,79 @@ def do_browser_history(user="~"):
                         con.close()
                     except Exception as e:
                         p(f"Error with {name} - {e}", v=3)
+                        if f"{e}" == "database is locked":
+                            p("\tClose the browser and try again", v=3)
 
 
-def do_combine_csvs(
-    csvs=0, skip_og_filename_column=False, directory=os.getcwd(), remove_dupes=False
-):
-    p("Starting combine CSVs", v=5)
-    p("The current directory will be used to find the CSVs.", v=1)
-    paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
-    paths.reverse()
-    paths = [p for p in paths if str(p).endswith(".csv")]
-    if len(paths) == 0:
-        p("There are no csvs in this directory", v=1)
-        return
-    if csvs < 2:
-        accum = 1
-        p("File Paths", v=3)
-        for path in paths:
-            p(f"{accum} - {path}")
-            accum += 1
-        csvs = int(input("Enter the index of the last CSV to include:"))
-    file_paths = []
-    for path in paths:
-        if str(path).endswith(".csv"):
-            file_paths.append(str(path))
-            p(f"Added {path}", v=4)
-            csvs -= 1
-            if csvs == 0:
-                break
-    dfs = []
-    for path in file_paths:
-        df = pd.read_csv(path)
-        if not skip_og_filename_column:
-            df["Original CSV Filename"] = os.path.basename(path)
-        dfs.append(df)
-    df = pd.concat(dfs)
-    if remove_dupes:
-        # Remove dupes by all but df['Original CSV Filename']
-        df = df.drop_duplicates(
-            subset=[col for col in df.columns if col != "Original CSV Filename"]
-        )
-    df.to_csv("COMBINED_FILE.csv", index=False)
-    p("Outputed to COMBINED_FILE.csv", v=3)
+# ----------------#
+# Command history
+# ----------------#
 
 
-def do_unzip(zip_folder_count=0, directory=os.getcwd()):
-    p("Starting unzip", v=5)
-    p("The current directory will be used to find the .zip folders.", v=1)
-    paths = sorted(Path(directory).iterdir(), key=os.path.getmtime)
-    paths.reverse()
-    paths = [p for p in paths if str(p).endswith(".zip")]
-    if len(paths) == 0:
-        p("There are no zips in this directory", v=1)
-        return
-    if zip_folder_count < 2:
-        accum = 1
-        p("File Paths", v=3)
-        for path in paths:
-            p(f"{accum} - {path}")
-            accum += 1
-        zip_folder_count = int(input("Enter the index of the last .zip to include:"))
-    file_paths = []
-    for path in paths:
-        file_paths.append(str(path))
-        p(f"Added {path}", v=4)
-        zip_folder_count -= 1
-        if zip_folder_count == 0:
-            break
-    extracted_count = 0
-    for path in file_paths:
-        try:
-            with zipfile.ZipFile(path, "r") as zip_ref:
-                zip_ref.extractall(directory)
-            p(f"Extracted {path} to {directory}", v=2)
-            extracted_count += len(zip_ref.namelist())
-        except zipfile.BadZipFile:
-            p(f"Error: {path} is not a valid zip file.", v=1)
-        except Exception as e:
-            p(f"Error extracting {path}: {str(e)}", v=1)
-
-    p(f"Outputed to the contents of all zips into {directory}", v=1)
-
-
-def do_command_history(user="~"):
-    p("Gathering command history. Will output to cwd.", v=3)
-    cwd = os.getcwd()
-    cmd_history_path = (
-        os.path.expanduser(user)
-        + "/AppData\\Roaming\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt"
+@app.command()
+def cmd_history(user: str = "~"):
+    """Get command history path"""
+    path = os.path.expanduser(
+        user
+        + "/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt"
     )
-    with open(cmd_history_path, "r") as file:
-        with open(cwd + "\\powershell_history.txt", "w") as output_file:
-            for line in file:
-                output_file.write(line)
-    p("Command history gathered", v=1)
+
+    if os.path.exists(path):
+        out = Path("powershell_history.txt")
+        out.write_text(Path(path).read_text())
+        p("Saved powershell_history.txt")
 
 
-def awake(minutes=60, restart=False):
-    interval = 10  # seconds
-    iterations = (minutes * 60) / interval
-
-    p(f"Keeping the device awake for {minutes} minutes...")
-    cmd = [
-        "powershell",
-        "-Command",
-        "$WShell = New-Object -ComObject 'WScript.Shell'; "
-        f"for ($i = 0; $i -lt {iterations}; $i++) {{ "
-        f"$WShell.SendKeys('%'); Start-Sleep -Seconds {interval}; $temp = [Math]::Round(($i*{interval})/60, 1); Write-Output \"$temp of {minutes}. CTRL+C to End\"}}",
-    ]
-
-    with subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-    ) as proc:
-        for line in proc.stdout:
-            print(line, end="")
-
-    if restart:
-        p("Restarting device...")
-        cmd = ["shutdown", "/r", "/t", "0"]
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
-        )
+# ----------------#
+# Configure pip
+# ----------------#
 
 
-#############
-# Arguments #
-#############.
+@app.command()
+def configure_pip():
+    """Sets min package age to 14 days and sets trusted hosts for Python's pip"""
+    minimum_age_days = 14
 
-FUNCTIONS = [
-    {
-        "name": "Edit SOCX Config",
-        "command": "config",
-        "help": "",
-        "function": lambda: do_config(),
-        "arguments": [],
-    },
-    {
-        "name": "Stay Awake",
-        "command": "awake",
-        "help": "",
-        "function": awake,
-        "arguments": [
-            {
-                "name": "minutes",
-                "flag": "--minutes",
-                "short_flag": "-m",
-                "prompt": "Enter number of minutes to run for: ",
-                "type": int,
-                "default": 60,
-                "required": False,
-                "help": "Keeps device awake for this many minutes",
-            },
-            {
-                "name": "restart",
-                "flag": "--restart",
-                "short_flag": "-r",
-                "type": bool,
-                "action": "store_true",
-                "default": False,
-                "required": False,
-                "help": "Restart computer once done keeping device awake",
-            },
-        ],
-    },
-    {
-        "name": "Combine CSVs",
-        "command": "combine",
-        "help": "",
-        "function": do_combine_csvs,
-        "arguments": [
-            {
-                "name": "csvs",
-                "flag": "--csvs",
-                "short_flag": "-c",
-                "prompt": "Enter number of CSVs to combine (1 for walkthrough): ",
-                "type": int,
-                "default": 0,
-                "required": False,
-                "help": "Combine the last X modified CSVs in the current directory. Enter 1 for walkthrough",
-            },
-            {
-                "name": "directory",
-                "flag": "--directory",
-                "short_flag": "-d",
-                "type": str,
-                "default": os.getcwd(),
-                "required": False,
-                "help": "The directory to use, defaults to cwd",
-            },
-            {
-                "name": "skip_og_filename_column",
-                "flag": "--skip_og_filename_column",
-                "short_flag": "-sname",
-                "action": "store_true",
-                "type": bool,
-                "default": False,
-                "required": False,
-                "help": "Include a column with the OG file name",
-            },
-            {
-                "name": "remove_dupes",
-                "flag": "--deduplicate",
-                "short_flag": "-dedupe",
-                "action": "store_true",
-                "type": bool,
-                "default": False,
-                "required": False,
-                "help": "Remove duplicate rows (excludes OG file name column)",
-            },
-        ],
-    },
-    {
-        "name": "Unzip .zip Folders",
-        "command": "unzip",
-        "help": "",
-        "function": do_unzip,
-        "arguments": [
-            {
-                "name": "zip_folder_count",
-                "flag": "--count",
-                "short_flag": "-c",
-                "prompt": "Enter number of zips to combine (1 for walkthrough): ",
-                "type": int,
-                "default": 0,
-                "required": False,
-                "help": "Combine the last X .zips in the current directory. Enter 1 for walkthrough",
-            },
-            {
-                "name": "directory",
-                "flag": "--directory",
-                "short_flag": "-d",
-                "type": str,
-                "default": os.getcwd(),
-                "required": False,
-                "help": "The directory to use, defaults to cwd",
-            },
-        ],
-    },
-    {
-        "name": "Unwrap a URLDefense URL",
-        "command": "unwrap",
-        "help": "",
-        "function": do_url_unwrap,
-        "arguments": [
-            {
-                "name": "url",
-                "flag": "--url",
-                "short_flag": "-u",
-                "prompt": "Enter the URL: ",
-                "type": str,
-                "required": True,
-                "help": "A URL to unwrap (remove safelinks and protectlinks)",
-            },
-        ],
-        "category": "unwrap",
-    },
-    {
-        "name": "Get info on a URL, domain, or ip",
-        "command": "info",
-        "help": "",
-        "function": do_info,
-        "rules": {"require_one_of": ["url", "domain", "ip"]},
-        "arguments": [
-            {
-                "name": "url",
-                "flag": "--url",
-                "short_flag": "-u",
-                "prompt": "Enter the URL: ",
-                "type": str,
-                "required": False,
-                "help": "A URL to get info on",
-            },
-            {
-                "name": "domain",
-                "flag": "--domain",
-                "short_flag": "-d",
-                "prompt": "Enter the domain: ",
-                "type": str,
-                "required": False,
-                "help": "A domain (e.g., google.com)",
-            },
-            {
-                "name": "ip",
-                "flag": "--ip",
-                "short_flag": "-ip",
-                "prompt": "Enter the IP: ",
-                "type": str,
-                "required": False,
-                "help": "An IP address",
-            },
-        ],
-        "category": "info",
-    },
-    {
-        "name": "Find a file",
-        "command": "find",
-        "help": "",
-        "function": do_filename_search,
-        "arguments": [
-            {
-                "name": "filename",
-                "flag": "--filename",
-                "short_flag": "-f",
-                "prompt": "Enter the file's name: ",
-                "type": str,
-                "required": True,
-                "help": "A file or folder name",
-            },
-            {
-                "name": "is_regex",
-                "flag": "--regex",
-                "short_flag": "-r",
-                "prompt": "Use regex pattern? (y/n): ",
-                "type": bool,
-                "action": "store_true",
-                "default": False,
-                "required": False,
-                "help": "The query is a regex pattern",
-            },
-            {
-                "name": "find_all",
-                "flag": "--find_all",
-                "short_flag": "-a",
-                "prompt": "Find all occurrences? (y/n): ",
-                "type": bool,
-                "action": "store_true",
-                "default": False,
-                "required": False,
-                "help": "Find all occurrences (default is find first)",
-            },
-            {
-                "name": "case_sensitive",
-                "flag": "--sensitive",
-                "short_flag": "-i",
-                "prompt": "Case sensitive search? (y/n): ",
-                "type": bool,
-                "action": "store_true",
-                "default": False,
-                "required": False,
-                "help": "Search case insensitive (default is case sensitive)",
-            },
-            {
-                "name": "directory",
-                "flag": "--directory",
-                "short_flag": "-d",
-                "type": str,
-                "default": os.getcwd(),
-                "required": False,
-                "help": "The directory to use, defaults to cwd",
-            },
-            {
-                "name": "skip_smart",
-                "flag": "--skip_smart",
-                "short_flag": "-ss",
-                "type": bool,
-                "default": False,
-                "action": "store_true",
-                "required": False,
-                "help": "Do smart search (try directory then user folder then C: then D:)",
-            },
-        ],
-    },
-    {
-        "name": "Gather browser history",
-        "command": "browser_history",
-        "help": "",
-        "function": do_browser_history,
-        "arguments": [
-            {
-                "name": "user",
-                "flag": "--user",
-                "short_flag": "-U",
-                "prompt": "Enter the user's name (~ for current): ",
-                "type": str,
-                "default": "~",
-                "required": False,
-                "help": "The user's name to use. Default is current user.",
-            }
-        ],
-    },
-    {
-        "name": "Gather command history",
-        "command": "cmd_history",
-        "help": "",
-        "function": do_command_history,
-        "arguments": [
-            {
-                "name": "user",
-                "flag": "--user",
-                "short_flag": "-U",
-                "prompt": "Enter the user's name (~ for current): ",
-                "type": str,
-                "default": "~",
-                "required": False,
-                "help": "The user's name to use. Default is current user.",
-            }
-        ],
-    },
-    # INTERACTIVE MODE MUST BE LAST OR INDEX IS OFF!
-    {
-        "name": "Interactive mode",
-        "command": "interactive",
-        "help": "",
-        "function": lambda: interactive_mode(),
-        "arguments": [],
-    },
-]
+    os.environ["PIP_TRUSTED_HOST"] = "pypi.org files.pythonhosted.org pypi.python.org"
 
-####################
-# Interactive Mode #
-####################.
+    # Future custom policy support
+    os.environ["PIP_MINIMUM_AGE_DAYS"] = str(minimum_age_days)
+
+    typer.echo("Configured pip environment variables:")
+    typer.echo(f"  PIP_TRUSTED_HOST={os.environ['PIP_TRUSTED_HOST']}")
+    typer.echo(f"  PIP_MINIMUM_AGE_DAYS={os.environ['PIP_MINIMUM_AGE_DAYS']}")
 
 
-def interactive_mode():
-    functions_copy = [f for f in FUNCTIONS if f["command"] != "interactive"]
-    # Get Function
-    for index, func in enumerate(functions_copy):
-        print(f"{index}: {func['name']}")
-    try:
-        index = int(input("Enter the number of the function to perform: "))
-        selected = functions_copy[index]
-    except (ValueError, IndexError):
-        print("Invalid choice.")
-        return
-    # Get Arguments
-    kwargs = {}
-
-    optional_args = [
-        arg for arg in selected["arguments"] if not arg.get("required", False)
-    ]
-    if optional_args:
-        print(f"Optional arguments for {selected['name']}:")
-        for arg in optional_args:
-            if arg.get("action") == "store_true":
-                print(f"'{arg['flag']}' : {arg['help']}")
-            else:
-                print(f"'{arg['flag']} value' : {arg['help']}")
-        arguments = input(
-            "Enter optional arguments (e.g., --flag --flag2 value): "
-        ).strip()
-        if arguments:
-            tokens = arguments.split()
-            i = 0
-            while i < len(tokens):
-                flag = tokens[i]
-                arg_def = next(
-                    (arg for arg in optional_args if arg["flag"] == flag), None
-                )
-                if not arg_def:
-                    print(f"Warning: Unknown flag '{flag}' ignored.")
-                    i += 1
-                    continue
-                if arg_def.get("action") == "store_true":
-                    kwargs[arg_def["name"]] = True
-                    i += 1
-                else:
-                    if i + 1 >= len(tokens):
-                        print(
-                            f"Warning: No value provided for '{flag}'. Using default if available."
-                        )
-                        kwargs[arg_def["name"]] = arg_def.get("default")
-                        i += 1
-                        continue
-                    value = tokens[i + 1]
-                    try:
-                        kwargs[arg_def["name"]] = arg_def["type"](value)
-                        i += 2
-                    except (ValueError, TypeError):
-                        print(
-                            f"Warning: Invalid value '{value}' for '{flag}'. Using default if available."
-                        )
-                        kwargs[arg_def["name"]] = arg_def.get("default")
-                        i += 2
-    for arg in optional_args:
-        if arg["name"] not in kwargs:
-            if arg.get("action") == "store_true":
-                kwargs[arg["name"]] = False
-            elif arg.get("default", False):
-                kwargs[arg["name"]] = arg.get("default")
-
-    required_args = [arg for arg in selected["arguments"] if arg.get("required", False)]
-    for arg in required_args:
-        while True:
-            value = input(arg["prompt"]).strip()
-            if not value:
-                print("This argument is required. Please provide a value.")
-                continue
-            try:
-                kwargs[arg["name"]] = arg["type"](value)
-                break
-            except (ValueError, TypeError):
-                print(f"Invalid value for {arg['name']}. Please try again.")
-
-    try:
-        p(f"Calling function with {kwargs}", v=5)
-        selected["function"](**kwargs)
-    except TypeError as e:
-        print(f"Error calling function: {e}")
+# ----------------#
+# Config
+# ----------------#
 
 
-###################
-# Parse Arguments #
-###################.
+@app.command()
+def config():
+    """List and set SOCX configuration variables"""
+    keys = list(ENV_DEFAULTS.keys())
+
+    p("Configuration Keys:")
+
+    for i, k in enumerate(keys):
+        p(f"{i}: {k}")
+
+    idx = int(typer.prompt("Select key index to view and change one"))
+    key = keys[idx]
+
+    old = get_env(key)
+    p(f"Current: {old}")
+
+    new = typer.prompt("New value")
+
+    keyring.set_password("system", "_socX__" + key, new)
+    p("Updated")
 
 
-def build_parser():
-    parser = argparse.ArgumentParser(prog=PROGRAM_NAME, description=ABOUT, usage=USAGE)
-    parser.add_argument(
-        "-v",
-        "--verbosity",
-        type=int,
-        default=1,
-        help="Verbosity level, 0 for quiet, 5 for very verbose",
-    )
-    subparsers = parser.add_subparsers(dest="function", help="Function to perform")
-
-    # Categories
-    categories = {
-        cat["command"]: subparsers.add_parser(cat["command"], help=cat["help"])
-        for cat in FUNCTIONS
-    }
-    for category in categories:
-        category_parser = categories[category]
-        category_function = [f for f in FUNCTIONS if f["command"] == category][0]
-        arg_set = {}
-        for arg in category_function.get("arguments", []):
-            flag = arg["flag"]
-            if flag not in arg_set:
-                arg_set[flag] = arg
-        for flag, arg in arg_set.items():
-            kwargs = {
-                "help": arg.get("help", ""),
-            }
-            if arg.get("action"):
-                kwargs["action"] = arg["action"]
-            else:
-                kwargs["type"] = arg.get("type", str)
-                if arg.get("required", False):
-                    kwargs["required"] = True
-                elif arg.get("default", False):
-                    kwargs["default"] = arg.get("default")
-            # Use both short and long flags
-            flags = [arg["flag"]]
-            if arg.get("short_flag"):
-                flags.insert(0, arg["short_flag"])  # Short flag first
-            category_parser.add_argument(*flags, **kwargs)
-    return parser
-
-
-########
-# Main #
-########.
-
-
-def main():
-    global verbosity, environmental_variables
-
-    parser = build_parser()
-    args = parser.parse_args()
-
-    verbosity = args.verbosity
-
-    if not args.function:
-        print(ABOUT)
-        print(USAGE)
-        print(f"You did not provide a function for {PROGRAM_NAME} to do. ")
-        if "y" in input("Would you like to Enter interactive mode? (y/n): ").lower():
-            interactive_mode()
-            return
-
-    for func in FUNCTIONS:
-        if func["command"] == args.function:
-            selected = func
-            break
-    else:
-        print(f"Invalid function or missing required arguments for '{args.function}'.")
-        print(USAGE)
-        return
-
-    p(f"Raw Arguments: {args}", v=5)
-    kwargs = {}
-    for arg in selected["arguments"]:
-        arg_flag_name = arg["flag"].strip("-")
-        arg_name = arg["name"]
-        p(f"Processing {arg_flag_name}", v=5)
-
-        # If arg is required and missing
-        if arg.get("required", False) and getattr(args, arg_flag_name, None) is None:
-            print(f"Missing required argument: {arg['flag']}")
-            return
-        # If arg has a require one of rule
-        if selected.get("rules", {}).get("require_one_of", None) is not None:
-            require_one_of = selected["rules"]["require_one_of"]
-            count = 0
-            for a in require_one_of:
-                if getattr(args, a, None) is not None:
-                    count += 1
-            if not count:
-                print(
-                    f"Error: You must provide one of these arguments: {', '.join(require_one_of)}"
-                )
-        # If arg is present
-        if getattr(args, arg_flag_name, None) is not None:
-            kwargs[arg_name] = getattr(args, arg_flag_name)
-        # If arg has default and is not present
-        elif getattr(arg, "default", None) is not None:
-            kwargs[arg_name] = getattr(arg, "default")
-
-    # Call the function
-    try:
-        p(f"Calling {selected['function'].__name__} with {kwargs}", v=5)
-        selected["function"](**kwargs)
-    except TypeError as e:
-        print(f"Error calling function '{selected['name']}': {e}")
-
-    # if args.function == "config":
-    #     do_config()
-
-    # elif args.function == "info":
-    #     if args.ip:
-    #         do_ip_info(args.ip)
-    #     elif args.domain:
-    #         do_domain_info(args.domain)
-    #     elif args.url:
-    #         do_url_info(args.url)
-
-    # elif args.function == "search":
-    #     if args.filename:
-    #         do_filename_search(
-    #             args.filename, args.find_all, args.regex, args.insensitive
-    #         )
-
-    # elif args.function == "tools":
-    #     if args.url:
-    #         do_url_unwrap(args.url)
-    #     elif args.browser_history:
-    #         do_browser_history(args.user)
-    #     elif args.csvs:
-    #         do_combine_csvs(args.csvs)
-    #     elif args.cmd_history:
-    #         do_command_history(args.user)
-
+# ----------------#
+# Entry
+# ----------------#
 
 if __name__ == "__main__":
-    main()
+    app()

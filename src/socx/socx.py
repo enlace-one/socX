@@ -730,35 +730,38 @@ def cmd_history(user: str = "~"):
 # ----------------#
 
 
+@app.command()
 def configure_pip():
-    """Configure pip for the current Python environment"""
+    """Configure pip for user and active virtual environment"""
 
-    minimum_age_days = 14
+    uploaded_prior_to = "P14D"
 
-    local_pip_base = [
-        sys.executable,
-        "-m",
-        "pip",
-        "config",
-        "--site",
-        "set",
-    ]
+    scopes = {
+        "site": [
+            sys.executable,
+            "-m",
+            "pip",
+            "config",
+            "--site",
+            "set",
+        ],
+        "user": [
+            sys.executable,
+            "-m",
+            "pip",
+            "config",
+            "--user",
+            "set",
+        ],
+    }
 
-    global_pip_base = [
-        sys.executable,
-        "-m",
-        "pip",
-        "config",
-        "set",
-    ]
-
-    for base in [local_pip_base, global_pip_base]:
+    for scope_name, base in scopes.items():
 
         subprocess.run(
             base
             + [
                 "global.trusted-host",
-                "pypi.org files.pythonhosted.org pypi.python.org",
+                "pypi.org",
             ],
             check=True,
         )
@@ -766,14 +769,33 @@ def configure_pip():
         subprocess.run(
             base
             + [
-                "global.minimum-age",
-                str(minimum_age_days),
+                "global.trusted-host",
+                "files.pythonhosted.org",
             ],
             check=True,
         )
 
-    typer.echo("Pip configuration updated for this Python environment")
-    typer.echo(f"  minimum-age = {minimum_age_days} days")
+        subprocess.run(
+            base
+            + [
+                "global.trusted-host",
+                "pypi.python.org",
+            ],
+            check=True,
+        )
+
+        subprocess.run(
+            base
+            + [
+                "global.uploaded-prior-to",
+                uploaded_prior_to,
+            ],
+            check=True,
+        )
+
+        typer.echo(f"Configured pip {scope_name} scope")
+
+    typer.echo(f"uploaded-prior-to = {uploaded_prior_to}")
 
 
 # ----------------#

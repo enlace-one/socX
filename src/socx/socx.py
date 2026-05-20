@@ -3,6 +3,7 @@
 import ipaddress
 import os
 import re
+import sys
 import zipfile
 import socket
 import subprocess
@@ -729,19 +730,50 @@ def cmd_history(user: str = "~"):
 # ----------------#
 
 
-@app.command()
 def configure_pip():
-    """Sets min package age to 14 days and sets trusted hosts for Python's pip"""
+    """Configure pip for the current Python environment"""
+
     minimum_age_days = 14
 
-    os.environ["PIP_TRUSTED_HOST"] = "pypi.org files.pythonhosted.org pypi.python.org"
+    local_pip_base = [
+        sys.executable,
+        "-m",
+        "pip",
+        "config",
+        "--site",
+        "set",
+    ]
 
-    # Future custom policy support
-    os.environ["PIP_MINIMUM_AGE_DAYS"] = str(minimum_age_days)
+    global_pip_base = [
+        sys.executable,
+        "-m",
+        "pip",
+        "config",
+        "set",
+    ]
 
-    typer.echo("Configured pip environment variables:")
-    typer.echo(f"  PIP_TRUSTED_HOST={os.environ['PIP_TRUSTED_HOST']}")
-    typer.echo(f"  PIP_MINIMUM_AGE_DAYS={os.environ['PIP_MINIMUM_AGE_DAYS']}")
+    for base in [local_pip_base, global_pip_base]:
+
+        subprocess.run(
+            base
+            + [
+                "global.trusted-host",
+                "pypi.org files.pythonhosted.org pypi.python.org",
+            ],
+            check=True,
+        )
+
+        subprocess.run(
+            base
+            + [
+                "global.minimum-age",
+                str(minimum_age_days),
+            ],
+            check=True,
+        )
+
+    typer.echo("Pip configuration updated for this Python environment")
+    typer.echo(f"  minimum-age = {minimum_age_days} days")
 
 
 # ----------------#

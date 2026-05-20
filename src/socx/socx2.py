@@ -8,6 +8,7 @@ import socket
 import subprocess
 from urllib.parse import unquote, urlparse
 import datetime as dt
+import sqlite3 as sql
 
 try:
     from . import util
@@ -475,18 +476,20 @@ def unwrap(url: str):
 
 
 @app.command()
-def combine(directory: str = ".", count: int = 2):
+def combine(
+    directory: str = typer.Option(".", "-d", "--directory"),
+    count: str = typer.Option(2, "-c", "--count"),
+):
     """Combine multiple CSVs of the same format"""
 
-    p("Starting CSV combine", v=2)
+    p("Starting combine CSV", v=2)
 
-    if directory == ".":
-        p("Using current working directory", v=3)
+    count = int(count)
 
     directory = os.path.abspath(directory)
 
-    p(f"Using directory: {directory}", v=2)
-    p(f"Looking for {count} CSV file(s)", v=2)
+    p(f"Using directory: {directory}", v=3)
+    p(f"Looking for {count} CSV file(s)", v=3)
 
     files = sorted(Path(directory).glob("*.csv"), key=os.path.getmtime, reverse=True)
 
@@ -499,16 +502,27 @@ def combine(directory: str = ".", count: int = 2):
     dfs = []
 
     for f in files[:count]:
-        p(f"Loading {f.name}", v=2)
+        p(f"Loading {f.name}", v=4)
 
         df = pd.read_csv(f)
 
-        p(f"Loaded {len(df)} row(s)", v=4)
+        p(f"Loaded {len(df)} row(s)", v=5)
 
         df["source"] = f.name
         dfs.append(df)
 
-    p("Concatenating dataframes", v=2)
+    p("Concatenating dataframes", v=3)
+
+    cleaned = [
+        df
+        for df in dfs
+        if df is not None and not df.empty and not df.isna().all().all()
+    ]
+
+    if cleaned:
+        out = pd.concat(dfs)
+    else:
+        pd.DataFrame()
 
     out = pd.concat(dfs)
 
@@ -516,7 +530,9 @@ def combine(directory: str = ".", count: int = 2):
 
     output_filename = f"SOCX_COMBINED_FILE_{timestamp}.csv"
 
-    p(f"Writing output to {output_filename}", v=2)
+    p(f"Writing output to {output_filename}", v=4)
+
+    output_filename = os.path.join(directory, output_filename)
 
     out.to_csv(output_filename, index=False)
 
@@ -685,6 +701,8 @@ def browser_history(user: str = "~"):
                         con.close()
                     except Exception as e:
                         p(f"Error with {name} - {e}", v=3)
+                        if f"{e}" == "database is locked":
+                            p("\tClose the browser and try again", v=3)
 
 
 # ----------------#

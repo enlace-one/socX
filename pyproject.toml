@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "socx"
-version = "2.4.1" # DONT FORGET TO UPDATE VERSION IN socx.py
+version = "2.5.0" # DONT FORGET TO UPDATE VERSION IN socx.py
 description = "A set of useful tools for a security operations center"
 readme = "README.md"
 authors = [

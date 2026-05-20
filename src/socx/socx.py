@@ -24,7 +24,7 @@ from pathlib import Path
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
-VERSION = "2.4.1"
+VERSION = "2.5.0"
 ABOUT = rf"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -44,12 +44,12 @@ USAGE = rf"""Usage:
 Examples:
     {PROGRAM_NAME} --help
     {PROGRAM_NAME} info --help
-    {PROGRAM_NAME} info 1.2.3.4
+    {PROGRAM_NAME} info 103.03.03.03
     {PROGRAM_NAME} -v 3 info google.com
     {PROGRAM_NAME} find filename.txt -i False
     {PROGRAM_NAME} find fold.*name -r
     {PROGRAM_NAME} unwrap "https://urldefense.com/v3/__https:/..."
-    {PROGRAM_NAME} combine --csvs 5
+    {PROGRAM_NAME} combine --count 5
     {PROGRAM_NAME} awake --minutes 90
     {PROGRAM_NAME} awake --restart
 """

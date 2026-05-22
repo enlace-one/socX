@@ -1,39 +1,63 @@
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "socx"
-version = "2.5.0" # DONT FORGET TO UPDATE VERSION IN socx.py
+version = "2.5.1"
 description = "A set of useful tools for a security operations center"
 readme = "README.md"
+requires-python = ">=3.10"
+
 authors = [
     { name = "Enlace", email = "enlace.aman@gmail.com" }
 ]
-requires-python = ">=3.8"
-keywords = ["soc", "security", "operations", "automation"]  # ← Helps discoverability
 
-dependencies = [
-    "keyring>=25.6.0",
-    "pandas>=2.3.3",
-    "requests>=2.32.5",
+keywords = [
+    "soc",
+    "security",
+    "operations",
+    "automation"
 ]
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: Microsoft :: Windows",
     "Intended Audience :: Information Technology",
     "Topic :: Security",
 ]
 
+dependencies = [
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "requests>=2.34.2",
+    "rich>=15.0.0",
+    "typer>=0.25.1",
+    "keyring>=25.7.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
 [project.urls]
-Homepage = "https://enlace.one"  # ← Optional but recommended
+Homepage = "https://enlace.one"
 Repository = "https://github.com/enlace-one/socx"
 
 [project.scripts]
-socx = "socx:main"  # ← CLI entry point
+socx = "socx.socx:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/socx"]
+sources = ["src"]
+
+[tool.ruff]
+line-length = 100

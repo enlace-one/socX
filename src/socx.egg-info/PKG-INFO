@@ -1,25 +1,32 @@
 Metadata-Version: 2.4
 Name: socx
-Version: 2.5.0
+Version: 2.5.1
 Summary: A set of useful tools for a security operations center
 Author-email: Enlace <enlace.aman@gmail.com>
 Project-URL: Homepage, https://enlace.one
 Project-URL: Repository, https://github.com/enlace-one/socx
 Keywords: soc,security,operations,automation
 Classifier: Programming Language :: Python :: 3
-Classifier: Programming Language :: Python :: 3.8
-Classifier: Programming Language :: Python :: 3.9
 Classifier: Programming Language :: Python :: 3.10
 Classifier: Programming Language :: Python :: 3.11
 Classifier: Programming Language :: Python :: 3.12
-Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3.14
+Classifier: Operating System :: Microsoft :: Windows
 Classifier: Intended Audience :: Information Technology
 Classifier: Topic :: Security
-Requires-Python: >=3.8
+Requires-Python: >=3.10
 Description-Content-Type: text/markdown
-Requires-Dist: keyring>=25.6.0
-Requires-Dist: pandas>=2.3.3
-Requires-Dist: requests>=2.32.5
+Requires-Dist: numpy>=2.0
+Requires-Dist: pandas>=2.2
+Requires-Dist: requests>=2.34.2
+Requires-Dist: rich>=15.0.0
+Requires-Dist: typer>=0.25.1
+Requires-Dist: keyring>=25.7.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
 
 # SOCX
 
@@ -67,11 +74,48 @@ Examples:
 
 ## Dev Info
 
+## Package Install 
+
+Create venv
+```
+uv venv
+```
+
+Install dev packages:
+```
+uv pip install -e ".[dev]"
+```
+
+Install other packages:
+```
+uv sync
+```
+
+Lock the versions:
+```
+uv lock
+```
+
+Compatability:
+```
+uv export --format requirements-txt > requirements.txt
+```
+
 ### Uploading Python Package
+```
+uv build
+```
 
-python -m build
+Test locally in a seperate window without venv
+```
+uv pip install dist/*.whl
+```
 
+```
 python -m twine upload --repository testpypi dist/*
+```
 
+```
 python -m twine upload dist/*
+```
 

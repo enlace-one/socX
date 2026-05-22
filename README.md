@@ -36,19 +36,56 @@ Examples:
 
     socx unwrap "https://urldefense.com/v3/__https:/..."
 
-    socx combine --count 5
+    socx combine 5
 
-    socx awake --minutes 90
-
+    socx awake 90
+    
     socx awake --restart
 
 ## Dev Info
 
+## Package Install 
+
+Create venv
+```
+uv venv
+```
+
+Install dev packages:
+```
+uv pip install -e ".[dev]"
+```
+
+Install other packages:
+```
+uv sync
+```
+
+Lock the versions:
+```
+uv lock
+```
+
+Compatability:
+```
+uv export --format requirements-txt > requirements.txt
+```
+
 ### Uploading Python Package
+```
+uv build
+```
 
-python -m build
+Test locally in a seperate window without venv
+```
+uv pip install dist/*.whl
+```
 
+```
 python -m twine upload --repository testpypi dist/*
+```
 
+```
 python -m twine upload dist/*
+```
 

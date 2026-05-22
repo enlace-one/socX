@@ -25,7 +25,7 @@ from pathlib import Path
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 ABOUT = rf"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
@@ -50,8 +50,8 @@ Examples:
     {PROGRAM_NAME} find filename.txt -i False
     {PROGRAM_NAME} find fold.*name -r
     {PROGRAM_NAME} unwrap "https://urldefense.com/v3/__https:/..."
-    {PROGRAM_NAME} combine --count 5
-    {PROGRAM_NAME} awake --minutes 90
+    {PROGRAM_NAME} combine 5
+    {PROGRAM_NAME} awake 90
     {PROGRAM_NAME} awake --restart
 """
 
@@ -478,8 +478,8 @@ def unwrap(url: str):
 
 @app.command()
 def combine(
+    count: int = typer.Argument(2, help="The number of CSVs to combine"),
     directory: str = typer.Option(".", "-d", "--directory"),
-    count: str = typer.Option(2, "-c", "--count"),
 ):
     """Combine multiple CSVs of the same format"""
 
@@ -600,21 +600,35 @@ def unzip(directory: str = ".", count: int = 1):
 
 
 @app.command()
-def awake(minutes: int = 60):
+def awake(
+    minutes: int = typer.Argument(60, help="The number of minutes to stay awake for"),
+    restart: bool = typer.Option(False, "--restart", "-r"),
+):
     """Keep your screen awake"""
-    interval = 10
-    iterations = int((minutes * 60) / interval)
+    interval = 10  # seconds
+    iterations = (minutes * 60) / interval
 
-    p(f"Keeping awake for {minutes} minutes")
-
+    p(f"Keeping the device awake for {minutes} minutes...")
     cmd = [
         "powershell",
         "-Command",
-        f"$w=new-object -com wscript.shell;for($i=0;$i -lt {iterations};$i++){{"
-        f"$w.SendKeys('%');start-sleep {interval}}}",
+        "$WShell = New-Object -ComObject 'WScript.Shell'; "
+        f"for ($i = 0; $i -lt {iterations}; $i++) {{ "
+        f"$WShell.SendKeys('%'); Start-Sleep -Seconds {interval}; $temp = [Math]::Round(($i*{interval})/60, 1); Write-Output \"$temp of {minutes}. CTRL+C to End\"}}",
     ]
 
-    subprocess.run(cmd)
+    with subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+    ) as proc:
+        for line in proc.stdout:
+            print(line, end="")
+
+    if restart:
+        p("Restarting device...")
+        cmd = ["shutdown", "/r", "/t", "0"]
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
+        )
 
 
 # ----------------#

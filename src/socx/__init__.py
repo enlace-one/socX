@@ -1,5 +1,3 @@
-try:
-    from .socx import main
-except:
-    from socx import main
+# src/socx/__init__.py
 
+__all__ = []

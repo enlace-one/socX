@@ -1,3 +1,4 @@
 .qodo
 .venv
 dist
+__pycache__/

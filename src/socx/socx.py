@@ -61,7 +61,11 @@ app = typer.Typer(help="SOCX - Security Operations Center utility toolkit")
 # Globals
 # ----------------#
 
-ENV_DEFAULTS = {"DefaultVerbosity": "2", "VirusTotalAPIKey": ""}
+ENV_DEFAULTS = {
+    "DefaultVerbosity": "2",
+    "VirusTotalAPIKey": "",
+    "VerifySSLCertificates": "true",
+}
 
 
 class AppState:
@@ -83,6 +87,11 @@ def get_env(name: str):
 
 
 default_verbosity = int(get_env("DefaultVerbosity"))
+
+verify_ssl_certificates = f"{get_env('DefaultVerbosity')}".lower().strip() in [
+    "true",
+    "1",
+]
 
 # ----------------#
 # Banner
@@ -132,16 +141,15 @@ def unwrap_url(url: str) -> str:
 
 def print_ip_info(ip: str):
     p("Retrieving WHOIS information", v=5)
-
     try:
         url = f"https://whois.arin.net/rest/ip/{ip}"
-        ip_xml = requests.get(url, timeout=10).text
+        ip_xml = requests.get(url, timeout=10, verify=verify_ssl_certificates).text
 
         ns = {"ns": "https://www.arin.net/whoisrws/core/v1"}
         root = ET.fromstring(ip_xml)
 
         org_url = root.find("ns:orgRef", ns).text
-        org_xml = requests.get(org_url, timeout=10).text
+        org_xml = requests.get(org_url, timeout=10, verify=verify_ssl_certificates).text
         org = ET.fromstring(org_xml)
 
         p(f"Organization: {org.find('ns:name', ns).text}")
@@ -297,6 +305,7 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
                     headers={"x-apikey": api},
                     data={"url": url},
                     timeout=10,
+                    verify=verify_ssl_certificates,
                 )
 
                 p(f"VirusTotal submission status: {resp.status_code}")

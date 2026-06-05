@@ -81,6 +81,8 @@ Test locally in a seperate window without venv
 uv pip install dist/*.whl
 ```
 
+Delete old version from dist/*
+
 ```
 python -m twine upload --repository testpypi dist/*
 ```

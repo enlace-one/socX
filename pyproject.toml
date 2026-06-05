@@ -1,6 +1,6 @@
 [project]
 name = "socx"
-version = "2.5.1"
+version = "2.5.2"
 description = "A set of useful tools for a security operations center"
 readme = "README.md"
 requires-python = ">=3.10"

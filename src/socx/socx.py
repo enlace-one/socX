@@ -25,7 +25,7 @@ from pathlib import Path
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
-VERSION = "2.5.1"
+VERSION = "2.5.2"
 ABOUT = rf"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /

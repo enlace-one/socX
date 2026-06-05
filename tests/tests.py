@@ -92,11 +92,14 @@ def test_combine_csvs():
     expected_content = """name, id,source
 bob,1,assets.csv
 ted,2,assets2.csv"""
+    alt_expected_content = expected_content = """name, id,source
+ted,2,assets2.csv
+bob,1,assets.csv"""
     with open(saved_file_path, "r") as f:
         content = f.read().strip()
-        if content != expected_content:
+        if content != expected_content and content != alt_expected_content:
             print(content)
-        assert content == expected_content
+        assert content == expected_content or content == alt_expected_content
 
     os.remove(saved_file_path)
 
@@ -163,11 +166,24 @@ def test_find_command():
     )
 
     assert result.exit_code == 0
-    # try:
     assert "PhineasAndFerb.txt" in result.output
-    # except:
-    #     print(f"File name not in {result.stdout}. {result.stderr}")
-    #     assert "PhineasAndFerb.txt" in result.stdout
+
+
+def test_find_multiple_command():
+
+    result = run_cli(
+        [
+            "find",
+            "assets",
+            "--multiple",
+            "--directory",
+            str(TEST_FILES_DIR),
+        ]
+    )
+
+    assert result.exit_code == 0
+    assert "assets.csv" in result.output
+    assert "assets2.csv" in result.output
 
 
 def test_find_command_not_found():

@@ -326,12 +326,20 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
 # ----------------#
 class FileFinder:
     def __init__(
-        self, filename, directory, regex, find_all, case_sensitive, smart_search
+        self,
+        filename,
+        directory,
+        regex,
+        find_all,
+        find_multiple,
+        case_sensitive,
+        smart_search,
     ):
         self.filename = filename
         self.directory = directory
         self.regex = regex
         self.find_all = find_all
+        self.find_multiple = find_multiple
         self.case_sensitive = case_sensitive
         self.smart_search = smart_search
         self.results = []
@@ -409,11 +417,13 @@ class FileFinder:
                 if self.matches(f):
                     m = os.path.join(root, f)
                     p(f"Match found: {m}", v=2)
-                    self.results.append(m)
-                    if not self.find_all:
+                    self.results.append(os.path.abspath(m))
+                    if not self.find_all and not self.find_multiple:
                         self.done = True
                         break
         self.directories_searched.append(os.path.abspath(directory))
+        if self.find_multiple:
+            self.done = True
 
     def report(self):
         if self.results:
@@ -432,6 +442,7 @@ def find(
     directory: str = typer.Option(".", "-d", "--directory"),
     regex: bool = typer.Option(False, "-r", "--regex"),
     find_all: bool = typer.Option(False, "-a", "--all"),
+    find_multiple: bool = typer.Option(False, "-m", "--multiple"),
     case_sensitive: bool = typer.Option(False, "-c", "--case-sensitive"),
     skip_smart_search: bool = typer.Option(False, "-s", "--skip_smart"),
 ):
@@ -439,6 +450,10 @@ def find(
 
     if find_all and not skip_smart_search:
         p("Smart search not available as find_all is True", v=2)
+        skip_smart_search = True
+
+    if find_multiple and not skip_smart_search:
+        p("Smart search not available as find_multiple is True", v=2)
         skip_smart_search = True
 
     drive_root = os.path.splitdrive(os.path.abspath(directory))[0] + os.sep
@@ -460,6 +475,7 @@ def find(
         directory,
         regex,
         find_all,
+        find_multiple,
         case_sensitive,
         smart_search=not skip_smart_search,
     )

@@ -2,13 +2,14 @@ import os
 import sys
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 # Add src directory to Python path
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT_DIR / "src"
 
 sys.path.insert(0, str(SRC_DIR))
 
-from typer.testing import CliRunner
 from socx import socx
 
 runner = CliRunner()
@@ -260,7 +261,7 @@ if __name__ == "__main__":
                 print("STDOUT:", repr(last_result.stdout_bytes))
                 print("STDERR:", repr(last_result.stderr_bytes))
 
-                raise (e)
+                raise e
 
     print("\n========================")
     print(f"PASSED: {passed}")

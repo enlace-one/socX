@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 
+import datetime as dt
 import ipaddress
 import os
 import re
-import sys
-import zipfile
 import socket
-import subprocess
-from urllib.parse import unquote, urlparse
-import datetime as dt
 import sqlite3 as sql
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+import zipfile
+from pathlib import Path
+from urllib.parse import unquote, urlparse
 
 try:
     from . import util
-except:
+except ImportError:
     import util
 
-import requests
-import pandas as pd
-import typer
 import keyring
-import xml.etree.ElementTree as ET
-from pathlib import Path
+import pandas as pd
+import requests
+import typer
 
 PROGRAM_NAME = "socx"
 # Also change this in pyproject.toml
@@ -239,7 +239,7 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
             p(f"Hostname: {host[0]}")
 
         except Exception as e:
-            p(f"Hostname lookup failed", v=2)
+            p("Hostname lookup failed", v=2)
             p(f"{e}", v=4)
 
         ping(ip)

@@ -48,6 +48,10 @@ jobs:
         run: |
           ruff format --check .
 
+      - name: Audit dependencies
+        run: |
+          pip-audit
+
       - name: Test
         run: |
           pytest

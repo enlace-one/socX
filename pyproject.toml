@@ -42,6 +42,7 @@ dev = [
     "pytest",
     "ruff",
     "mypy",
+    "pip-audit",
 ]
 
 [project.urls]

@@ -637,9 +637,11 @@ def awake(
     cmd = [
         "powershell",
         "-Command",
-        "$WShell = New-Object -ComObject 'WScript.Shell'; "
-        f"for ($i = 0; $i -lt {iterations}; $i++) {{ "
-        f"$WShell.SendKeys('%'); Start-Sleep -Seconds {interval}; $temp = [Math]::Round(($i*{interval})/60, 1); Write-Output \"$temp of {minutes}. CTRL+C to End\"}}",
+        f"""WShell = New-Object -ComObject 'WScript.Shell';
+        for ($i = 0; $i -lt {iterations}; $i++) {{
+        $WShell.SendKeys('%'); Start-Sleep -Seconds {interval};
+        $temp = [Math]::Round(($i*{interval})/60, 1);
+        Write-Output "$temp of {minutes}. CTRL+C to End"}}""",
     ]
 
     with subprocess.Popen(

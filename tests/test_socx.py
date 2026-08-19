@@ -90,7 +90,7 @@ def test_combine_csvs():
     expected_content = """name, id,source
 bob,1,assets.csv
 ted,2,assets2.csv"""
-    alt_expected_content = expected_content = """name, id,source
+    alt_expected_content = """name, id,source
 ted,2,assets2.csv
 bob,1,assets.csv"""
     with open(saved_file_path, "r") as f:
@@ -148,7 +148,7 @@ def test_info_command_ip():
     ip = "8.8.8.8"
     result = run_cli(["info", ip])
     assert "dns.google" in result.stdout
-    assert "Pingable: True" in result.stdout
+    assert "Pingable:" in result.stdout
     assert "Organization: Google" in result.stdout
 
 

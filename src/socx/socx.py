@@ -162,9 +162,7 @@ def print_ip_info(ip: str):
 
 def ping(ip):
     p("Running ping test", v=5)
-    result = subprocess.run(
-        ["ping", "-n", "1", ip], capture_output=True, text=True, check=False
-    )
+    result = subprocess.run(["ping", "-n", "1", ip], capture_output=True, text=True, check=False)
     if result.returncode != 0:
         p(f"Pingable: False ({ip} is down)")
     elif "Reply" in result.stdout:
@@ -228,7 +226,6 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
     p(f"Determined argument is of type {argument_type}.", v=5)
 
     if argument_type == "ip":
-
         p(f"IP lookup requested for {ip}", v=3)
 
         try:
@@ -247,7 +244,6 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
         print_ip_info(ip)
 
     elif argument_type == "domain":
-
         p(f"Domain lookup requested for {domain}", v=3)
 
         if domain.startswith("http"):
@@ -259,7 +255,6 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
         p(f"Normalized domain: {domain}", v=3)
 
         try:
-
             p("Resolving domain", v=5)
 
             ip_resolved = socket.gethostbyname(domain)
@@ -267,7 +262,6 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
             p(f"IP: {ip_resolved}")
 
         except Exception as e:
-
             p(f"Domain resolution failed: {e}", v=1)
 
             ip_resolved = None
@@ -275,13 +269,11 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
         ping(domain)
 
         if ip_resolved:
-
             print_ip_info(ip_resolved)
 
         p(f"WHOIS: https://www.whois.com/whois/{domain}")
 
     elif argument_type == "url":
-
         p("URL lookup requested", v=3)
 
         p("Unwrapping URL", v=4)
@@ -293,13 +285,11 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
         api = get_env("VirusTotalAPIKey")
 
         if api:
-
             p("VirusTotal API key detected", v=3)
 
             p("Submitting URL to VirusTotal...", v=2)
 
             try:
-
                 resp = requests.post(
                     "https://www.virustotal.com/api/v3/urls",
                     headers={"x-apikey": api},
@@ -313,7 +303,6 @@ def info(argument: str = typer.Argument(None, help="An IP, Domain, or URL")):
                 p(resp.text, v=5)
 
             except Exception as e:
-
                 p(f"VirusTotal submission failed: {e}", v=1)
                 p(e, v=5)
 
@@ -381,9 +370,7 @@ class FileFinder:
 
         # Search other drives
         while not self.done:
-            current_drive = os.path.splitdrive(os.path.abspath(self.directory))[
-                0
-            ].upper()
+            current_drive = os.path.splitdrive(os.path.abspath(self.directory))[0].upper()
 
             p(f"Done searching current drive ({current_drive})", v=2)
 
@@ -431,9 +418,7 @@ class FileFinder:
             for r in self.results:
                 p(f"- {r}")
         else:
-            p(
-                f"Not found {'anywhere' if self.smart_search else 'in ' + self.directory}"
-            )
+            p(f"Not found {'anywhere' if self.smart_search else 'in ' + self.directory}")
 
 
 @app.command()
@@ -539,11 +524,7 @@ def combine(
 
     p("Concatenating dataframes", v=3)
 
-    cleaned = [
-        df
-        for df in dfs
-        if df is not None and not df.empty and not df.isna().all().all()
-    ]
+    cleaned = [df for df in dfs if df is not None and not df.empty and not df.isna().all().all()]
 
     if cleaned:
         out = pd.concat(dfs)
@@ -597,12 +578,10 @@ def unzip(directory: str = ".", count: int = 1):
         raise typer.Exit()
 
     for z in zips[:count]:
-
         p(f"Extracting {z.name}", v=2)
 
         try:
             with zipfile.ZipFile(z, "r") as zip_ref:
-
                 p(f"Extracting into {directory}", v=4)
 
                 zip_ref.extractall(directory)
@@ -644,18 +623,14 @@ def awake(
         Write-Output "$temp of {minutes}. CTRL+C to End"}}""",
     ]
 
-    with subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
-    ) as proc:
+    with subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as proc:
         for line in proc.stdout:
             print(line, end="")
 
     if restart:
         p("Restarting device...")
         cmd = ["shutdown", "/r", "/t", "0"]
-        proc = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True
-        )
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
 
 
 # ----------------#
@@ -756,8 +731,7 @@ def browser_history(user: str = "~"):
 def cmd_history(user: str = "~"):
     """Get command history path"""
     path = os.path.expanduser(
-        user
-        + "/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt"
+        user + "/AppData/Roaming/Microsoft/Windows/PowerShell/PSReadLine/ConsoleHost_history.txt"
     )
 
     if os.path.exists(path):
@@ -797,7 +771,6 @@ def configure_pip():
     }
 
     for scope_name, base in scopes.items():
-
         subprocess.run(
             base
             + [

@@ -20,17 +20,11 @@ class URLDefenseDecoder:
         )
         URLDefenseDecoder.v1_pattern = re.compile(r"u=(?P<url>.+?)&k=")
         URLDefenseDecoder.v2_pattern = re.compile(r"u=(?P<url>.+?)&[dc]=")
-        URLDefenseDecoder.v3_pattern = re.compile(
-            r"v3/__(?P<url>.+?)__;(?P<enc_bytes>.*?)!"
-        )
+        URLDefenseDecoder.v3_pattern = re.compile(r"v3/__(?P<url>.+?)__;(?P<enc_bytes>.*?)!")
         URLDefenseDecoder.v3_token_pattern = re.compile(r"\*(\*.)?")
-        URLDefenseDecoder.v3_single_slash = re.compile(
-            r"^([a-z0-9+.-]+:/)([^/].+)", re.IGNORECASE
-        )
+        URLDefenseDecoder.v3_single_slash = re.compile(r"^([a-z0-9+.-]+:/)([^/].+)", re.IGNORECASE)
         URLDefenseDecoder.v3_run_mapping = {}
-        run_values = (
-            string.ascii_uppercase + string.ascii_lowercase + string.digits + "-" + "_"
-        )
+        run_values = string.ascii_uppercase + string.ascii_lowercase + string.digits + "-" + "_"
         run_length = 2
         for value in run_values:
             URLDefenseDecoder.v3_run_mapping[value] = run_length
@@ -80,9 +74,7 @@ class URLDefenseDecoder:
                 return character
             if token.startswith("**"):
                 run_length = self.v3_run_mapping[token[-1]]
-                run = self.dec_bytes[
-                    self.current_marker : self.current_marker + run_length
-                ]
+                run = self.dec_bytes[self.current_marker : self.current_marker + run_length]
                 self.current_marker += run_length
                 return run
 

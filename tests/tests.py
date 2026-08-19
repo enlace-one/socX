@@ -51,10 +51,7 @@ def run_cli(args):
 
 def test_unwrap_url():
 
-    wrapped_url = (
-        "https://nam01.safelinks.protection.outlook.com/"
-        "?url=https%3A%2F%2Fgoogle.com"
-    )
+    wrapped_url = "https://nam01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fgoogle.com"
 
     result = socx.unwrap_url(wrapped_url)
 
@@ -223,11 +220,8 @@ def test_regex_find():
 # ----------------#
 
 if __name__ == "__main__":
-
     tests = [
-        value
-        for func, value in locals().items()
-        if func.startswith("test") and callable(value)
+        value for func, value in locals().items() if func.startswith("test") and callable(value)
     ]
 
     passed = 0
@@ -236,11 +230,9 @@ if __name__ == "__main__":
     print(f"\nRunning {len(tests)} tests...\n")
 
     for test in tests:
-
         print(f"Running {test.__name__}...")
 
         try:
-
             test()
 
             print("\tPASSED")
@@ -248,13 +240,11 @@ if __name__ == "__main__":
             passed += 1
 
         except Exception:
-
             failed += 1
 
             print("\tFAILED")
 
             if last_result:
-
                 print("EXIT:", last_result.exit_code)
                 print("OUTPUT:", repr(last_result.output))
                 print("EXCEPTION:", repr(last_result.exception))

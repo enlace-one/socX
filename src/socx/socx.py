@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import datetime as dt
 import ipaddress
 import os
@@ -164,7 +162,9 @@ def print_ip_info(ip: str):
 
 def ping(ip):
     p("Running ping test", v=5)
-    result = subprocess.run(["ping", "-n", "1", ip], capture_output=True, text=True)
+    result = subprocess.run(
+        ["ping", "-n", "1", ip], capture_output=True, text=True, check=False
+    )
     if result.returncode != 0:
         p(f"Pingable: False ({ip} is down)")
     elif "Reply" in result.stdout:
@@ -552,7 +552,7 @@ def combine(
 
     out = pd.concat(dfs)
 
-    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d_%H%M%S")
 
     output_filename = f"SOCX_COMBINED_FILE_{timestamp}.csv"
 

@@ -261,7 +261,7 @@ if __name__ == "__main__":
                 print("STDOUT:", repr(last_result.stdout_bytes))
                 print("STDERR:", repr(last_result.stderr_bytes))
 
-                raise e
+                raise
 
     print("\n========================")
     print(f"PASSED: {passed}")

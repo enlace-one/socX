@@ -61,3 +61,8 @@ sources = ["src"]
 
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
+ignore = [
+    "BLE001",  # Broad exception catches are intentional in some CLI operations
+]

@@ -50,7 +50,7 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          pip-audit
+          pip-audit --local
 
       - name: Test
         run: |

@@ -55,7 +55,7 @@ def test_unwrap_url():
 
     result = socx.unwrap_url(wrapped_url)
 
-    assert "google.com" in result
+    assert "https://google.com" in result
 
 
 def test_help():

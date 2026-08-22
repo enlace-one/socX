@@ -86,7 +86,7 @@ def get_env(name: str):
 
 default_verbosity = int(get_env("DefaultVerbosity"))
 
-verify_ssl_certificates = f"{get_env('DefaultVerbosity')}".lower().strip() in [
+verify_ssl_certificates = f"{get_env('VerifySSLCertificates')}".lower().strip() in [
     "true",
     "1",
 ]

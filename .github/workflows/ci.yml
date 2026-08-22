@@ -38,6 +38,7 @@ jobs:
       - name: Install package
         run: |
           python -m pip install --upgrade pip
+          python -m pip install --upgrade setuptools
           python -m pip install ".[dev]"
 
       - name: Lint
@@ -47,6 +48,10 @@ jobs:
       - name: Check formatting
         run: |
           ruff format --check .
+
+      - name: Audit dependencies
+        run: |
+          pip-audit --local
 
       - name: Test
         run: |

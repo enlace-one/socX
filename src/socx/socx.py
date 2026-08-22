@@ -86,7 +86,7 @@ def get_env(name: str):
 
 default_verbosity = int(get_env("DefaultVerbosity"))
 
-verify_ssl_certificates = f"{get_env('DefaultVerbosity')}".lower().strip() in [
+verify_ssl_certificates = f"{get_env('VerifySSLCertificates')}".lower().strip() in [
     "true",
     "1",
 ]
@@ -179,9 +179,9 @@ def ping(ip):
 
 
 def determine_info_argument_type(argument: str) -> str:
-    """
-    Determines if the input is an IP, domain, or URL.
-    Returns: "ip", "domain", or "url"
+    """Determine if the input is an IP, domain, or URL.
+
+    Return: "ip", "domain", or "url"
     """
 
     argument = argument.strip()
@@ -346,6 +346,7 @@ class FileFinder:
             return self.filename.lower() in item_to_match.lower()
 
     def search(self):
+        """Handle the search logic and which directories to search based on the provided options."""
         current_directory = self.directory
 
         # Search current directory tree
@@ -395,6 +396,7 @@ class FileFinder:
             break
 
     def search_directory(self, directory):
+        """Search a specific directory for the filename."""
         for root, dirs, files in os.walk(directory):
             if os.path.abspath(root) in self.directories_searched:
                 dirs.clear()  # Prunes os.walk from descending into subdirectories
@@ -424,14 +426,26 @@ class FileFinder:
 @app.command()
 def find(
     filename,
-    directory: str = typer.Option(".", "-d", "--directory"),
+    directory: str = typer.Option(None, "-d", "--directory"),
     regex: bool = typer.Option(False, "-r", "--regex"),
     find_all: bool = typer.Option(False, "-a", "--all"),
     find_multiple: bool = typer.Option(False, "-m", "--multiple"),
     case_sensitive: bool = typer.Option(False, "-c", "--case-sensitive"),
     skip_smart_search: bool = typer.Option(False, "-s", "--skip_smart"),
 ):
-    """Search for a file or folder"""
+    """Search for a file or folder.
+
+    By default, search the current
+    directory and work backwards through parent directories.
+    Disable this behavior when --skip_smart, --multiple, --all,
+    or --directory are provided.
+    """
+
+    if directory is None:
+        directory = "."
+    else:
+        # If a directory is provided, it should be the only thing searched.
+        skip_smart_search = True
 
     if find_all and not skip_smart_search:
         p("Smart search not available as find_all is True", v=2)

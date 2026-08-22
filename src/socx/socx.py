@@ -179,9 +179,9 @@ def ping(ip):
 
 
 def determine_info_argument_type(argument: str) -> str:
-    """
-    Determines if the input is an IP, domain, or URL.
-    Returns: "ip", "domain", or "url"
+    """Determine if the input is an IP, domain, or URL.
+
+    Return: "ip", "domain", or "url"
     """
 
     argument = argument.strip()
@@ -346,6 +346,7 @@ class FileFinder:
             return self.filename.lower() in item_to_match.lower()
 
     def search(self):
+        """Handle the search logic and which directories to search based on the provided options."""
         current_directory = self.directory
 
         # Search current directory tree
@@ -395,6 +396,7 @@ class FileFinder:
             break
 
     def search_directory(self, directory):
+        """Search a specific directory for the filename."""
         for root, dirs, files in os.walk(directory):
             if os.path.abspath(root) in self.directories_searched:
                 dirs.clear()  # Prunes os.walk from descending into subdirectories
@@ -431,9 +433,13 @@ def find(
     case_sensitive: bool = typer.Option(False, "-c", "--case-sensitive"),
     skip_smart_search: bool = typer.Option(False, "-s", "--skip_smart"),
 ):
-    """Search for a file or folder. By default, it will search the current
+    """Search for a file or folder.
+
+    By default, search the current
     directory and work backwards through parent directories.
-    Use --skip_smart, --multiple, --all, or --directory to disable this behavior."""
+    Disable this behavior when --skip_smart, --multiple, --all,
+    or --directory are provided.
+    """
 
     if directory is None:
         directory = "."

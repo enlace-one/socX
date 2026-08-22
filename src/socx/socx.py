@@ -424,14 +424,22 @@ class FileFinder:
 @app.command()
 def find(
     filename,
-    directory: str = typer.Option(".", "-d", "--directory"),
+    directory: str = typer.Option(None, "-d", "--directory"),
     regex: bool = typer.Option(False, "-r", "--regex"),
     find_all: bool = typer.Option(False, "-a", "--all"),
     find_multiple: bool = typer.Option(False, "-m", "--multiple"),
     case_sensitive: bool = typer.Option(False, "-c", "--case-sensitive"),
     skip_smart_search: bool = typer.Option(False, "-s", "--skip_smart"),
 ):
-    """Search for a file or folder"""
+    """Search for a file or folder. By default, it will search the current
+    directory and work backwards through parent directories.
+    Use --skip_smart, --multiple, --all, or --directory to disable this behavior."""
+
+    if directory is None:
+        directory = "."
+    else:
+        # If a directory is provided, it should be the only thing searched.
+        skip_smart_search = True
 
     if find_all and not skip_smart_search:
         p("Smart search not available as find_all is True", v=2)

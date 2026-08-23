@@ -95,10 +95,30 @@ jobs:
         run: |
           python -m twine check dist/*
 
+      - name: Create runtime environment
+        run: |
+          python -m venv .sbom-venv
+          .\.sbom-venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.sbom-venv\Scripts\python.exe -m pip install .
+
+      - name: Install SBOM generator
+        run: |
+          python -m pip install cyclonedx-bom
+
+      - name: Generate SBOM
+        run: |
+          cyclonedx-py environment .\.sbom-venv\Scripts\python.exe `
+            --pyproject pyproject.toml `
+            --output-format JSON `
+            --output-file dist\socx-sbom.cdx.json `
+            --output-reproducible
+
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: "dist/*"
+          subject-path: |
+            dist/*.whl  
+            dist/*.tar.gz
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

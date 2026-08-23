@@ -61,7 +61,7 @@ jobs:
 
       - name: Test
         run: |
-          pytest
+          pytest -v
 
   build:
     name: Build and Verify Package

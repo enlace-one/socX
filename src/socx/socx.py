@@ -22,16 +22,13 @@ import requests
 import typer
 
 PROGRAM_NAME = "socx"
-# Also change this in pyproject.toml
-VERSION = "2.5.2"
-ABOUT = rf"""
+ABOUT = r"""
    _____ ____  _______  __
   / ___// __ \/ ____/ |/ /
   \__ \/ / / / /    |   / 
  ___/ / /_/ / /___ /   |  
 /____/\____/\____//_/|_|  
 
-Version: {VERSION}
 A tool to assist with day to day activites in a security operations center (pronounced "socks")
 
 Visit https://enlace.one/ for more information.

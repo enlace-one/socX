@@ -195,12 +195,12 @@ jobs:
 
   verify-testpypi:
     name: Verify TestPyPI Release
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     needs: publish-testpypi
 
     permissions:
       contents: read
-      id-token: write # no read perm for id-token
+      attestations: read
 
     steps:
       - name: Set up Python
@@ -209,24 +209,37 @@ jobs:
           python-version: "3.12"
 
       - name: Set release version
-        shell: bash
+        shell: pwsh
         run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          $version = "${{ github.ref_name }}" -replace "^v", ""
+          "VERSION=$version" >> $env:GITHUB_ENV
 
       - name: Install from TestPyPI
+        shell: pwsh
         run: |
-          python -m pip install \
-            --index-url https://test.pypi.org/simple/ \
-            --extra-index-url https://pypi.org/simple/ \
-            "socx==${VERSION}"
+          python -m pip install `
+            --index-url https://test.pypi.org/simple/ `
+            --extra-index-url https://pypi.org/simple/ `
+            "socx==$env:VERSION"
 
       - name: Verify installation
+        shell: pwsh
         run: |
           socx --help
 
-      - name: Verify artifact attestation
+      - name: Download wheel from TestPyPI
+        shell: pwsh
         run: |
-          gh attestation verify \
-            socx-${VERSION}-py3-none-any.whl \
-            --owner enlace-one \
+          python -m pip download `
+            --no-deps `
+            --only-binary=:all: `
+            --index-url https://test.pypi.org/simple/ `
+            "socx==$env:VERSION"
+
+      - name: Verify artifact attestation
+        shell: pwsh
+        run: |
+          gh attestation verify `
+            "socx-$env:VERSION-py3-none-any.whl" `
+            --owner enlace-one `
             --repo socx

@@ -238,6 +238,8 @@ jobs:
 
       - name: Verify artifact attestation
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh attestation verify `
             "socx-$env:VERSION-py3-none-any.whl" `

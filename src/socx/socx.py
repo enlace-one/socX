@@ -370,7 +370,7 @@ class FileFinder:
             current_directory = parent
 
         # Search other drives
-        while not self.done:
+        while not self.done and self.smart_search:
             current_drive = os.path.splitdrive(os.path.abspath(self.directory))[0].upper()
 
             p(f"Done searching current drive ({current_drive})", v=2)

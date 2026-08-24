@@ -71,7 +71,7 @@ def test_default_banner():
     result = run_cli([])
 
     assert result.exit_code == 0
-    assert "Version:" in result.stdout
+    assert '"pronounced "socks"' in result.stdout
 
 
 def test_combine_csvs():

@@ -200,7 +200,7 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write
+      id-token: write # no read perm for id-token
 
     steps:
       - name: Set up Python

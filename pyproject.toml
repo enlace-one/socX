@@ -37,12 +37,16 @@ dependencies = [
     "keyring>=25.7.0"
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest",
     "ruff",
     "mypy",
     "pip-audit",
+    "build",
+    "setuptools",
+    "cyclonedx-bom",
+    "twine",
 ]
 
 [project.urls]

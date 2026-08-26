@@ -243,5 +243,4 @@ jobs:
         run: |
           gh attestation verify `
             "socx-$env:VERSION-py3-none-any.whl" `
-            --owner enlace-one `
-            --repo socx
+            -R enlace-one/socx

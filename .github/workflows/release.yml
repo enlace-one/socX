@@ -38,19 +38,19 @@ jobs:
 
       - name: Audit dependencies
         run: |
-          pip-audit --local
+          uv run pip-audit --local
 
       - name: Lint
         run: |
-          ruff check .
+          uv run ruff check .
 
       - name: Check formatting
         run: |
-          ruff format --check .
+          uv run ruff format --check .
 
       - name: Test
         run: |
-          pytest
+          uv run pytest
 
   validate-release:
     name: Validate Release Version

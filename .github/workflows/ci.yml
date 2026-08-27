@@ -48,16 +48,16 @@ jobs:
 
       - name: Lint
         run: |
-          ruff check .
+          uv run ruff check .
 
       - name: Check formatting
         run: |
-          ruff format --check .
+          uv run ruff format --check .
 
       - name: Audit dependencies
         run: |
-          pip-audit --local
+          uv run pip-audit --local
 
       - name: Test
         run: |
-          pytest -v --durations=2
+          uv run pytest -v --durations=2

@@ -1,4 +1,4 @@
-annotated-doc==0.0.4
+annotated-doc==0.0.5
 certifi==2026.5.20
 charset-normalizer==3.4.7
 click==8.3.3

@@ -128,11 +128,11 @@ jobs:
 
       - name: Build package
         run: |
-          python -m build
+          uv run python -m build
 
       - name: Check package
         run: |
-          python -m twine check dist/*
+          uv run python -m twine check dist/*
 
       - name: Create runtime environment
         run: |

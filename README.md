@@ -44,50 +44,10 @@ Examples:
 
 ## Dev Info
 
-## Package Install 
+### Setup Cloned Repo
 
-Create venv
+1. Set up venv
+2. Run this to install the uv lock pre-commit hook.
 ```
-uv venv
+uv run pre-commit install
 ```
-
-Install dev packages:
-```
-uv pip install -e ".[dev]"
-```
-
-Install other packages:
-```
-uv sync
-```
-
-Lock the versions:
-```
-uv lock
-```
-
-Compatability:
-```
-uv export --format requirements-txt > requirements.txt
-```
-
-### Uploading Python Package
-```
-uv build
-```
-
-Test locally in a seperate window without venv
-```
-uv pip install dist/*.whl
-```
-
-Delete old version from dist/*
-
-```
-python -m twine upload --repository testpypi dist/*
-```
-
-```
-python -m twine upload dist/*
-```
-
